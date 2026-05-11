@@ -301,7 +301,7 @@ deps: ADMIN-02, ADMIN-05, ADMIN-06
 !v cd apps/admin && ./vendor/bin/phpunit tests/RenderingTest.php
 !c feat(admin): Twig templates + Bootstrap 5 CSS — admin UI
 
-### [ ] ADMIN-10 SmtpMailer + email notifications (assignment, due-soon, overdue)
+### [x] ADMIN-10 SmtpMailer + email notifications (assignment, due-soon, overdue)
 +f lib/src/Mail/SmtpMailer.php
 +f lib/tests/Mail/SmtpMailerTest.php
 +f apps/admin/src/Services/NotificationService.php

@@ -7,6 +7,7 @@
         "php": "^8.3",
         "slim/psr7": "^1.6",
         "slim/slim": "^4.14",
+        "symfony/mailer": "^7.0",
         "task-tracker/core": "*@dev",
         "twig/twig": "^3.14"
     },
