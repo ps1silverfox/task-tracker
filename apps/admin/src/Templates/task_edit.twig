@@ -1,0 +1,117 @@
+{% extends 'layout.twig' %}
+
+{% block title %}{% if task is null %}New task{% else %}Edit {{ task.slug }}{% endif %} · Admin{% endblock %}
+
+{% block content %}
+<nav aria-label="breadcrumb">
+    <ol class="breadcrumb">
+        <li class="breadcrumb-item"><a href="/">Backlog</a></li>
+        <li class="breadcrumb-item active" aria-current="page">
+            {% if task is null %}New task{% else %}{{ task.slug }}{% endif %}
+        </li>
+    </ol>
+</nav>
+
+<h1 class="h3 mb-3">{% if task is null %}New task{% else %}Edit task{% endif %}</h1>
+
+<form method="post" action="{% if task is null %}/tasks{% else %}/tasks/{{ task.id|url_encode }}{% endif %}" class="row g-3">
+    <div class="col-md-4">
+        <label for="slug" class="form-label">Slug</label>
+        <input type="text" class="form-control" id="slug" name="slug"
+               value="{{ task.slug ?? '' }}" required pattern="[a-z0-9-]+">
+        <div class="form-text">lowercase, digits, dashes only</div>
+    </div>
+
+    <div class="col-md-8">
+        <label for="title" class="form-label">Title</label>
+        <input type="text" class="form-control" id="title" name="title"
+               value="{{ task.title ?? '' }}" required>
+    </div>
+
+    <div class="col-12">
+        <label for="body" class="form-label">Body</label>
+        <textarea class="form-control" id="body" name="body" rows="4">{{ task.body ?? '' }}</textarea>
+    </div>
+
+    <div class="col-md-3">
+        <label for="status" class="form-label">Status</label>
+        <select class="form-select" id="status" name="status">
+            {% for s in statuses %}
+                <option value="{{ s }}"{% if task and task.status == s %} selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label for="priority" class="form-label">Priority</label>
+        <select class="form-select" id="priority" name="priority">
+            {% for p in priorities %}
+                <option value="{{ p }}"{% if task and task.priority == p %} selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-3">
+        <label for="due_date" class="form-label">Due date</label>
+        <input type="date" class="form-control" id="due_date" name="due_date"
+               value="{{ task.dueDate ?? '' }}">
+    </div>
+
+    <div class="col-md-3">
+        <label for="effort_hours" class="form-label">Effort (hours)</label>
+        <input type="number" min="0" step="0.25" class="form-control"
+               id="effort_hours" name="effort_hours"
+               value="{{ task.effortHours ?? '' }}">
+    </div>
+
+    <div class="col-md-4">
+        <label for="assignee_id" class="form-label">Assignee</label>
+        <select class="form-select" id="assignee_id" name="assignee_id">
+            <option value="">— unassigned —</option>
+            {% for m in roster %}
+                <option value="{{ m.id }}"{% if task and task.assigneeId == m.id %} selected{% endif %}>
+                    {{ m.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-4">
+        <label for="team_id" class="form-label">Team</label>
+        <select class="form-select" id="team_id" name="team_id">
+            <option value="">— none —</option>
+            {% for t in teams %}
+                <option value="{{ t.id }}"{% if task and task.teamId == t.id %} selected{% endif %}>
+                    {{ t.name }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-md-4">
+        <label for="parent_id" class="form-label">Parent task ID</label>
+        <input type="text" class="form-control" id="parent_id" name="parent_id"
+               value="{{ task.parentId ?? '' }}">
+    </div>
+
+    <div class="col-12">
+        <label for="url" class="form-label">External URL</label>
+        <input type="url" class="form-control" id="url" name="url"
+               value="{{ task.url ?? '' }}">
+    </div>
+
+    <div class="col-12 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+            {% if task is null %}Create{% else %}Save{% endif %}
+        </button>
+        <a href="/" class="btn btn-outline-secondary">Cancel</a>
+        {% if task is not null %}
+            <button type="submit" formaction="/tasks/{{ task.id|url_encode }}/delete"
+                    formmethod="post" class="btn btn-outline-danger ms-auto"
+                    onclick="return confirm('Soft-delete this task?');">
+                Delete
+            </button>
+        {% endif %}
+    </div>
+</form>
+{% endblock %}

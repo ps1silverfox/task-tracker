@@ -1,0 +1,83 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Roster · Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Roster <span class="badge bg-secondary">{{ members|length }}</span></h1>
+</div>
+
+<div class="row">
+    <div class="col-lg-7">
+        {% if members is empty %}
+            <div class="alert alert-info">No roster members yet.</div>
+        {% else %}
+        <table class="table table-striped align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Team</th>
+                    <th>Status</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in members %}
+                <tr data-id="{{ m.id }}">
+                    <td>{{ m.name }}</td>
+                    <td>{{ m.email ?? '—' }}</td>
+                    <td>{{ m.teamId ?? '—' }}</td>
+                    <td>
+                        {% if m.active %}
+                            <span class="badge bg-success">active</span>
+                        {% else %}
+                            <span class="badge bg-secondary">inactive</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end">
+                        <form method="post" action="/roster/{{ m.id|url_encode }}/deactivate" class="d-inline">
+                            <button type="submit" class="btn btn-outline-danger btn-sm"
+                                    {% if not m.active %}disabled{% endif %}>
+                                Deactivate
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">Add member</div>
+            <div class="card-body">
+                <form method="post" action="/roster" class="row g-3">
+                    <div class="col-12">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" id="name" name="name" class="form-control" required>
+                    </div>
+                    <div class="col-12">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" id="email" name="email" class="form-control">
+                    </div>
+                    <div class="col-12">
+                        <label for="team_id" class="form-label">Team</label>
+                        <select id="team_id" name="team_id" class="form-select">
+                            <option value="">— none —</option>
+                            {% for t in teams %}
+                                <option value="{{ t.id }}">{{ t.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">Add</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

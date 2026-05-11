@@ -281,7 +281,7 @@ deps: ADMIN-01, REPO-06
 !v cd apps/admin && ./vendor/bin/phpunit tests/Controllers/SavedViewsControllerTest.php
 !c feat(admin): SavedViewsController
 
-### [ ] ADMIN-08 Health endpoint + 404 handler
+### [x] ADMIN-08 Health endpoint + 404 handler
 +f apps/admin/src/Controllers/HealthController.php
 +f apps/admin/tests/Controllers/HealthControllerTest.php
 +m apps/admin/src/routes.php
@@ -289,7 +289,7 @@ deps: ADMIN-01
 !v cd apps/admin && ./vendor/bin/phpunit tests/Controllers/HealthControllerTest.php
 !c feat(admin): GET /health endpoint + 404 handler
 
-### [ ] ADMIN-09 Twig templates for backlog + edit form
+### [x] ADMIN-09 Twig templates for backlog + edit form
 +f apps/admin/src/Templates/layout.twig
 +f apps/admin/src/Templates/backlog.twig
 +f apps/admin/src/Templates/task_edit.twig

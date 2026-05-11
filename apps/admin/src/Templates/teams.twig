@@ -1,0 +1,62 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Teams · Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Teams <span class="badge bg-secondary">{{ teams|length }}</span></h1>
+</div>
+
+<div class="row">
+    <div class="col-lg-7">
+        {% if teams is empty %}
+            <div class="alert alert-info">No teams yet.</div>
+        {% else %}
+        <table class="table table-striped align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Name</th>
+                    <th>Description</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in teams %}
+                <tr data-id="{{ t.id }}">
+                    <td>{{ t.name }}</td>
+                    <td>{{ t.description ?? '—' }}</td>
+                    <td class="text-end">
+                        <form method="post" action="/teams/{{ t.id|url_encode }}" class="d-inline">
+                            <input type="hidden" name="name" value="{{ t.name }}">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm">Edit</button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-5">
+        <div class="card">
+            <div class="card-header">Create team</div>
+            <div class="card-body">
+                <form method="post" action="/teams" class="row g-3">
+                    <div class="col-12">
+                        <label for="name" class="form-label">Name</label>
+                        <input type="text" id="name" name="name" class="form-control" required>
+                    </div>
+                    <div class="col-12">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea id="description" name="description" class="form-control" rows="3"></textarea>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">Create</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

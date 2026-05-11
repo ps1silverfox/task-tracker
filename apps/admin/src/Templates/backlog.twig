@@ -1,0 +1,50 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Backlog · Task Tracker · Admin{% endblock %}
+
+{% block content %}
+{% set status_colors = {'open': 'secondary', 'in_progress': 'primary', 'blocked': 'warning', 'done': 'success'} %}
+{% set priority_colors = {'low': 'info', 'med': 'secondary', 'high': 'warning', 'critical': 'danger'} %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Backlog <span class="badge bg-secondary">{{ tasks|length }}</span></h1>
+    <a class="btn btn-primary btn-sm" href="/tasks/new">+ New task</a>
+</div>
+
+{% if tasks is empty %}
+    <div class="alert alert-info" role="alert">
+        No tasks yet. <a href="/tasks/new" class="alert-link">Create the first one</a>.
+    </div>
+{% else %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover align-middle">
+        <thead class="table-dark">
+            <tr>
+                <th scope="col">Slug</th>
+                <th scope="col">Title</th>
+                <th scope="col">Status</th>
+                <th scope="col">Priority</th>
+                <th scope="col">Assignee</th>
+                <th scope="col">Due</th>
+                <th scope="col" class="text-end">Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for task in tasks %}
+            <tr data-id="{{ task.id }}">
+                <td><code>{{ task.slug }}</code></td>
+                <td>{{ task.title }}</td>
+                <td><span class="badge bg-{{ status_colors[task.status]|default('secondary') }}">{{ task.status }}</span></td>
+                <td><span class="badge bg-{{ priority_colors[task.priority]|default('secondary') }}">{{ task.priority }}</span></td>
+                <td>{{ task.assigneeId ?? '—' }}</td>
+                <td>{{ task.dueDate ?? '—' }}</td>
+                <td class="text-end">
+                    <a class="btn btn-outline-secondary btn-sm" href="/tasks/{{ task.id|url_encode }}">View</a>
+                    <a class="btn btn-outline-primary btn-sm"   href="/tasks/{{ task.id|url_encode }}/edit">Edit</a>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+{% endblock %}

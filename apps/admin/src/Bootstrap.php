@@ -33,6 +33,8 @@ use TaskTracker\Repositories\TaskRepository;
 use TaskTracker\Repositories\TeamRepository;
 use TaskTracker\Storage\CsvStore;
 use TaskTracker\Storage\EventLog;
+use Twig\Environment;
+use Twig\Loader\FilesystemLoader;
 
 /**
  * Admin Slim app bootstrap (ADMIN-01).
@@ -157,6 +159,19 @@ final class Bootstrap
                 $c->get(CsvStore::class),
                 $c->get(EventLog::class),
                 $csv($c, SavedViewRepository::class),
+            ),
+
+            // Twig environment for the admin UI templates (ADMIN-09). One instance
+            // shared across renders so the in-memory compiled-template cache pays
+            // off on the second render onward. strict_variables surfaces template
+            // typos as exceptions instead of silently rendering empty strings.
+            Environment::class => static fn(): Environment => new Environment(
+                new FilesystemLoader(__DIR__ . '/Templates'),
+                [
+                    'strict_variables' => true,
+                    'autoescape'       => 'html',
+                    'cache'            => false,
+                ],
             ),
 
             SubProjectRollup::class => static fn(ContainerInterface $c): SubProjectRollup
