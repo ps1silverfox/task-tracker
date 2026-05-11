@@ -129,8 +129,11 @@ final class Bootstrap
 
             // Controllers — registered so Slim's CallableResolver can hydrate
             // [Class::class, 'method'] route handlers via $container->get($id).
-            TasksController::class => static fn(ContainerInterface $c): TasksController
-                => new TasksController($c->get(TaskRepository::class)),
+            TasksController::class => static fn(ContainerInterface $c): TasksController => new TasksController(
+                $c->get(TaskRepository::class),
+                $c->get(DependencyRepository::class),
+                $c->get(TagRepository::class),
+            ),
         ];
     }
 

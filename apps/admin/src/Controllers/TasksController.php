@@ -8,6 +8,9 @@ use InvalidArgumentException;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use RuntimeException;
+use TaskTracker\Models\Enums;
+use TaskTracker\Repositories\DependencyRepository;
+use TaskTracker\Repositories\TagRepository;
 use TaskTracker\Repositories\TaskRepository;
 
 /**
@@ -28,6 +31,8 @@ final class TasksController
 {
     public function __construct(
         private readonly TaskRepository $tasks,
+        private readonly DependencyRepository $dependencies,
+        private readonly TagRepository $tagsRepo,
     ) {
     }
 
@@ -167,6 +172,206 @@ final class TasksController
         return $response
             ->withStatus(303)
             ->withHeader('Location', '/');
+    }
+
+    /**
+     * POST /tasks/{id}/assign — body: {assignee_id|null}.
+     *
+     * `assignee_id` must be present in the body (empty string or "null" → unassign).
+     * Goes through TaskRepository::update so the FIRST_ASSIGNED_AT /
+     * LAST_ASSIGNMENT_CHANGE_AT semantics and the task.assigned/reassigned/unassigned
+     * event emission both happen inside the same transaction as the CSV write.
+     *
+     * @param array<string, string> $args
+     */
+    public function assign(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $id = (string) ($args['id'] ?? '');
+        if ($id === '' || $this->tasks->find($id) === null) {
+            return $this->jsonError($response->withStatus(404), 'not_found', "task not found: {$id}");
+        }
+
+        $body = $request->getParsedBody();
+        if (!is_array($body) || !array_key_exists('assignee_id', $body)) {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', 'missing required field: assignee_id');
+        }
+
+        $raw = $body['assignee_id'];
+        // Treat the literal string "null" the same as PHP null so HTML forms (which
+        // can't send a true null) can still express "unassign".
+        $assignee = ($raw === null || $raw === '' || $raw === 'null') ? null : (string) $raw;
+
+        try {
+            $this->tasks->update($id, ['assigneeId' => $assignee]);
+        } catch (InvalidArgumentException $e) {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', $e->getMessage());
+        } catch (RuntimeException $e) {
+            return $this->jsonError($response->withStatus(404), 'not_found', $e->getMessage());
+        }
+
+        return $response
+            ->withStatus(303)
+            ->withHeader('Location', '/tasks/' . rawurlencode($id));
+    }
+
+    /**
+     * POST /tasks/{id}/status — body: {status}.
+     *
+     * Validates against STATUSES_LIVE so `deleted` cannot be reached through the
+     * status endpoint; soft-delete must go through DELETE /tasks/{id}. The
+     * repository's COMPLETED_AT semantics fire when the target is `done`.
+     *
+     * @param array<string, string> $args
+     */
+    public function changeStatus(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $id = (string) ($args['id'] ?? '');
+        if ($id === '' || $this->tasks->find($id) === null) {
+            return $this->jsonError($response->withStatus(404), 'not_found', "task not found: {$id}");
+        }
+
+        $body = $request->getParsedBody();
+        if (!is_array($body) || !array_key_exists('status', $body)) {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', 'missing required field: status');
+        }
+
+        $status = (string) $body['status'];
+        if (!in_array($status, Enums::STATUSES_LIVE, true)) {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', "invalid status: {$status}");
+        }
+
+        try {
+            $this->tasks->update($id, ['status' => $status]);
+        } catch (InvalidArgumentException $e) {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', $e->getMessage());
+        } catch (RuntimeException $e) {
+            return $this->jsonError($response->withStatus(404), 'not_found', $e->getMessage());
+        }
+
+        return $response
+            ->withStatus(303)
+            ->withHeader('Location', '/tasks/' . rawurlencode($id));
+    }
+
+    /**
+     * POST /tasks/{id}/dependencies — body: {prereq_id}. Adds edge "id requires prereq_id".
+     *
+     * Cycle prevention and duplicate-edge rejection happen inside
+     * DependencyRepository::add under the CsvStore flock; both surface as 422.
+     *
+     * @param array<string, string> $args
+     */
+    public function addDependency(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $id = (string) ($args['id'] ?? '');
+        if ($id === '' || $this->tasks->find($id) === null) {
+            return $this->jsonError($response->withStatus(404), 'not_found', "task not found: {$id}");
+        }
+
+        $body = $request->getParsedBody();
+        if (!is_array($body) || !array_key_exists('prereq_id', $body)) {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', 'missing required field: prereq_id');
+        }
+        $prereqId = (string) $body['prereq_id'];
+        if ($prereqId === '') {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', 'prereq_id must not be empty');
+        }
+
+        try {
+            $this->dependencies->add($id, $prereqId);
+        } catch (InvalidArgumentException $e) {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', $e->getMessage());
+        } catch (RuntimeException $e) {
+            return $this->jsonError($response->withStatus(422), 'conflict', $e->getMessage());
+        }
+
+        return $response
+            ->withStatus(303)
+            ->withHeader('Location', '/tasks/' . rawurlencode($id));
+    }
+
+    /**
+     * DELETE /tasks/{id}/dependencies/{prereq_id} — idempotent edge removal.
+     *
+     * @param array<string, string> $args
+     */
+    public function removeDependency(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $id = (string) ($args['id'] ?? '');
+        $prereqId = (string) ($args['prereq_id'] ?? '');
+        if ($id === '' || $this->tasks->find($id) === null) {
+            return $this->jsonError($response->withStatus(404), 'not_found', "task not found: {$id}");
+        }
+        if ($prereqId === '') {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', 'prereq_id must not be empty');
+        }
+
+        try {
+            $this->dependencies->remove($id, $prereqId);
+        } catch (InvalidArgumentException $e) {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', $e->getMessage());
+        }
+
+        return $response
+            ->withStatus(303)
+            ->withHeader('Location', '/tasks/' . rawurlencode($id));
+    }
+
+    /**
+     * POST /tasks/{id}/tags — body: {tag}. Tag is normalized to lower-kebab.
+     *
+     * @param array<string, string> $args
+     */
+    public function addTag(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $id = (string) ($args['id'] ?? '');
+        if ($id === '' || $this->tasks->find($id) === null) {
+            return $this->jsonError($response->withStatus(404), 'not_found', "task not found: {$id}");
+        }
+
+        $body = $request->getParsedBody();
+        if (!is_array($body) || !array_key_exists('tag', $body)) {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', 'missing required field: tag');
+        }
+
+        try {
+            $this->tagsRepo->add($id, (string) $body['tag']);
+        } catch (InvalidArgumentException $e) {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', $e->getMessage());
+        } catch (RuntimeException $e) {
+            return $this->jsonError($response->withStatus(422), 'conflict', $e->getMessage());
+        }
+
+        return $response
+            ->withStatus(303)
+            ->withHeader('Location', '/tasks/' . rawurlencode($id));
+    }
+
+    /**
+     * DELETE /tasks/{id}/tags/{tag} — idempotent detach.
+     *
+     * @param array<string, string> $args
+     */
+    public function removeTag(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $id = (string) ($args['id'] ?? '');
+        $tag = (string) ($args['tag'] ?? '');
+        if ($id === '' || $this->tasks->find($id) === null) {
+            return $this->jsonError($response->withStatus(404), 'not_found', "task not found: {$id}");
+        }
+        if ($tag === '') {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', 'tag must not be empty');
+        }
+
+        try {
+            $this->tagsRepo->remove($id, $tag);
+        } catch (InvalidArgumentException $e) {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', $e->getMessage());
+        }
+
+        return $response
+            ->withStatus(303)
+            ->withHeader('Location', '/tasks/' . rawurlencode($id));
     }
 
     /**
