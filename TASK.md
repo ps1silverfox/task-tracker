@@ -145,7 +145,7 @@ deps: MODEL-01, LIB-04
 !v cd lib && ./vendor/bin/phpunit tests/Repositories/DependencyRepositoryTest.php
 !c feat(lib): DependencyRepository — cycle prevention via DFS at write time
 
-### [ ] REPO-05 TagRepository
+### [x] REPO-05 TagRepository
 +f lib/src/Repositories/TagRepository.php
 +f lib/tests/Repositories/TagRepositoryTest.php
 deps: MODEL-01, LIB-04
