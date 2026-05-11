@@ -131,14 +131,14 @@ deps: MODEL-01, LIB-04
 !v cd lib && ./vendor/bin/phpunit tests/Repositories/RosterRepositoryTest.php
 !c feat(lib): RosterRepository — add/update/deactivate
 
-### [ ] REPO-03 TeamRepository
+### [x] REPO-03 TeamRepository
 +f lib/src/Repositories/TeamRepository.php
 +f lib/tests/Repositories/TeamRepositoryTest.php
 deps: MODEL-01, LIB-04
 !v cd lib && ./vendor/bin/phpunit tests/Repositories/TeamRepositoryTest.php
 !c feat(lib): TeamRepository — create/update
 
-### [ ] REPO-04 DependencyRepository + cycle detection
+### [x] REPO-04 DependencyRepository + cycle detection
 +f lib/src/Repositories/DependencyRepository.php
 +f lib/tests/Repositories/DependencyRepositoryTest.php
 deps: MODEL-01, LIB-04
