@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Slim\App;
 use TaskTracker\Public\Controllers\BacklogController;
+use TaskTracker\Public\Controllers\TaskDetailController;
 
 return static function (App $app): void {
     // INVARIANT: only GET routes may ever be registered on this app.
@@ -12,4 +13,7 @@ return static function (App $app): void {
 
     // PUB-02 backlog list with query-string filters.
     $app->get('/', [BacklogController::class, 'list']);
+
+    // PUB-03 read-only task detail + activity feed.
+    $app->get('/tasks/{id}', [TaskDetailController::class, 'show']);
 };

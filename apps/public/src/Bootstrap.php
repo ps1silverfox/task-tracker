@@ -20,6 +20,7 @@ use TaskTracker\Aggregations\ExecutiveSummary;
 use TaskTracker\Aggregations\SubProjectRollup;
 use TaskTracker\Config\Env;
 use TaskTracker\Public\Controllers\BacklogController;
+use TaskTracker\Public\Controllers\TaskDetailController;
 use TaskTracker\Repositories\DependencyRepository;
 use TaskTracker\Repositories\EventRepository;
 use TaskTracker\Repositories\RosterRepository;
@@ -160,6 +161,10 @@ final class Bootstrap
             BacklogController::class => static fn(ContainerInterface $c): BacklogController => new BacklogController(
                 $c->get(TaskRepository::class),
                 $c->get(TagRepository::class),
+            ),
+            TaskDetailController::class => static fn(ContainerInterface $c): TaskDetailController => new TaskDetailController(
+                $c->get(TaskRepository::class),
+                $c->get(EventRepository::class),
             ),
         ];
     }
