@@ -436,7 +436,7 @@ deps: INT-04
 !v test -f README.md && grep -q 'task-tracker' README.md && echo OK
 !c docs: README.md — overview, quickstart, deploy pointer
 
-### [ ] INT-07 Final acceptance — all unit + integration tests pass
+### [x] INT-07 Final acceptance — all unit + integration tests pass
 deps: INT-01, INT-02, INT-03, PUB-09
 !v ./vendor/bin/phpunit
 !c chore: v1.0 acceptance — all tests green
