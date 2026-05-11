@@ -1,0 +1,35 @@
+{
+    "name": "task-tracker/workspace",
+    "description": "Task Tracker v1.0 — flat-file team task tracker (workspace root, references lib/ + apps/admin + apps/public).",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3"
+    },
+    "config": {
+        "sort-packages": true,
+        "preferred-install": "dist",
+        "optimize-autoloader": true
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "./lib",
+            "options": {
+                "symlink": false
+            }
+        }
+    ],
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "extra": {
+        "task-tracker": {
+            "components": [
+                "lib",
+                "apps/admin",
+                "apps/public"
+            ],
+            "license-policy": "docs/license-policy.md"
+        }
+    }
+}
