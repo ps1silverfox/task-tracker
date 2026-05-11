@@ -405,7 +405,7 @@ deps: ADMIN-09, PUB-08
 !v ./vendor/bin/phpunit tests/integration/AdminPublicSharedDataTest.php
 !c test(integration): admin write → public read via shared data/
 
-### [ ] INT-02 Audit-completeness invariant test (every write → NDJSON event)
+### [x] INT-02 Audit-completeness invariant test (every write → NDJSON event)
 +f tests/integration/AuditCompletenessTest.php
 deps: INT-01
 !v ./vendor/bin/phpunit tests/integration/AuditCompletenessTest.php
