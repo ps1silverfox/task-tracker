@@ -10,6 +10,7 @@ use Psr\Container\NotFoundExceptionInterface;
 use RuntimeException;
 use Slim\App;
 use Slim\Factory\AppFactory;
+use TaskTracker\Admin\Controllers\RosterController;
 use TaskTracker\Admin\Controllers\TasksController;
 use TaskTracker\Aggregations\DependencyGraph;
 use TaskTracker\Aggregations\ExecutiveSummary;
@@ -133,6 +134,9 @@ final class Bootstrap
                 $c->get(TaskRepository::class),
                 $c->get(DependencyRepository::class),
                 $c->get(TagRepository::class),
+            ),
+            RosterController::class => static fn(ContainerInterface $c): RosterController => new RosterController(
+                $c->get(RosterRepository::class),
             ),
         ];
     }

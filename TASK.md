@@ -257,7 +257,7 @@ deps: ADMIN-03, REPO-04, REPO-05
 !v cd apps/admin && ./vendor/bin/phpunit tests/Controllers/TasksControllerActionsTest.php
 !c feat(admin): TasksController — /assign, /status, /dependencies, /tags routes
 
-### [ ] ADMIN-05 RosterController
+### [x] ADMIN-05 RosterController
 +f apps/admin/src/Controllers/RosterController.php
 +f apps/admin/tests/Controllers/RosterControllerTest.php
 +m apps/admin/src/routes.php

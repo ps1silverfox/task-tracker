@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Slim\App;
+use TaskTracker\Admin\Controllers\RosterController;
 use TaskTracker\Admin\Controllers\TasksController;
 
 return static function (App $app): void {
@@ -21,4 +22,10 @@ return static function (App $app): void {
     $app->delete('/tasks/{id}/dependencies/{prereq_id}',  [TasksController::class, 'removeDependency']);
     $app->post('/tasks/{id}/tags',                        [TasksController::class, 'addTag']);
     $app->delete('/tasks/{id}/tags/{tag}',                [TasksController::class, 'removeTag']);
+
+    // ADMIN-05 roster routes.
+    $app->get('/roster',              [RosterController::class, 'list']);
+    $app->post('/roster',             [RosterController::class, 'create']);
+    $app->post('/roster/{id}',        [RosterController::class, 'update']);
+    $app->delete('/roster/{id}',      [RosterController::class, 'deactivate']);
 };
