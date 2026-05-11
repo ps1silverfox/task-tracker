@@ -1,0 +1,30 @@
+{
+    "name": "task-tracker/core",
+    "description": "Task Tracker v1.0 — shared core library (storage primitives, domain models, repositories, aggregations). Consumed by apps/admin and apps/public via a Composer path repository.",
+    "type": "library",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "ramsey/uuid": "^4.7"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "TaskTracker\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "TaskTracker\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true,
+        "preferred-install": "dist",
+        "optimize-autoloader": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
