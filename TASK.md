@@ -93,7 +93,7 @@ deps: LIB-01, LIB-02
 !v cd lib && ./vendor/bin/phpunit tests/Storage/CsvStoreTest.php
 !c feat(lib): CsvStore with flock + atomic-rename writes
 
-### [ ] LIB-05 EventLog (NDJSON append + daily rotation)
+### [x] LIB-05 EventLog (NDJSON append + daily rotation)
 +f lib/src/Storage/EventLog.php
 +f lib/tests/Storage/EventLogTest.php
 deps: LIB-02
