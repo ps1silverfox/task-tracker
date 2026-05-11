@@ -430,7 +430,7 @@ deps: INT-04
 !v test -f deploy/smoke.ps1 && powershell -Command "Get-Content deploy/smoke.ps1 | Select-String 'health' | Measure-Object | Select -ExpandProperty Count" | grep -q '[1-9]'
 !c deploy: smoke.ps1 — end-to-end curl validation
 
-### [ ] INT-06 Top-level README.md
+### [x] INT-06 Top-level README.md
 +f README.md
 deps: INT-04
 !v test -f README.md && grep -q 'task-tracker' README.md && echo OK

@@ -232,6 +232,83 @@ learn: EventRepository::listForTask() already streams every NDJSON file lexicogr
 ## 36|PUB-04|PASS
 +apps/public/composer.json,apps/public/src/Bootstrap.php,apps/public/src/routes.php,apps/public/src/Controllers/ExecutiveSummaryController.php,apps/public/src/Templates/summary.twig,apps/public/public/vendor/chartjs/chart.umd.min.js,apps/public/tests/Controllers/ExecutiveSummaryControllerTest.php,TASK.md
 verify: exit 0
-commit: PENDING
+commit: e446953
 learn: ExecutiveSummary already pre-fills zero-count buckets for every period in [from,to], so the controller never has to fill gaps — the template can iterate `rows` and Chart.js gets a continuous x-axis for free. PUB-04 introduces Twig to apps/public/ (was admin-only previously); summary.twig is intentionally standalone (no extends) because layout.twig is +f'd by PUB-08 — extending a not-yet-existent template would crash the template loader. Chart.js 4.4.7 UMD bundle from jsDelivr is MIT-licensed; copied locally per the no-CDN deploy rule. data-* attributes carry the series as JSON-encoded attributes so the inline <script> can parse them with JSON.parse without templating into a JS literal context (eliminates a whole class of XSS).
+---
+
+## 37|PUB-05|PASS
++apps/public/src/Controllers/ExportController.php,apps/public/src/routes.php,apps/public/src/Bootstrap.php,apps/public/tests/Controllers/ExportControllerTest.php
+verify: exit 0
+commit: 3b9a5f0
+learn: CsvInjectionGuard must run BEFORE the RFC 4180 quote+escape pass — wrapping a hostile cell in quotes does not neutralise Excel's formula evaluation of a leading `=`/`+`/`-`/`@`. The single-apostrophe prefix has to appear inside the opening quote (e.g. `"'=cmd..."`), which is what `CsvInjectionGuard::escape() -> str_replace('"', '""') -> wrap-in-quotes` produces in that order. Filter parsing duplicated from BacklogController rather than refactored — task scope listed only routes.php as +m, so disturbing BacklogController's already-green PUB-02 tests was deferred. A future BacklogFilter helper makes sense once PUB-07 (saved views) adds a third call site.
+---
+
+## 38|PUB-06|PASS
++apps/public/src/Controllers/GraphController.php,apps/public/src/Templates/graph.twig,apps/public/tests/Controllers/GraphControllerTest.php,apps/public/public/vendor/cytoscape/cytoscape.min.js,apps/public/public/vendor/cytoscape/cytoscape-dagre.min.js,apps/public/src/Bootstrap.php,apps/public/src/routes.php
+verify: exit 0
+commit: 1455098
+learn: Twig's |e('html_attr') escapes `=` to `&#x3D;` (any non-alphanumeric), which mangles URLs placed in `data-*` attributes. Default autoescape='html' is the right choice for URL-shaped attribute values — it only escapes `&<>"'` and leaves `=` and `%2C` intact so client-side fetch() receives the same query string the server saw.
+---
+
+## 39|PUB-07|PASS
++apps/public/src/Controllers/SavedViewsController.php,apps/public/tests/Controllers/SavedViewsControllerTest.php,apps/public/src/routes.php,apps/public/src/Bootstrap.php
+verify: exit 0
+commit: c822e10
+learn: 302-redirect to /?<query> instead of duplicating filter logic — BacklogController stays the single owner of FILTER_JSON semantics. http_build_query alone would PHP-array-encode list axes (status[0]=open), so list/triple axes must be flattened to comma-strings before the call; JSON null → literal "null" query value matches BacklogController::tripleState's IS-NULL sentinel.
+---
+
+## 40|PUB-08|PASS
++apps/public/src/Controllers/HealthController.php,apps/public/src/Templates/layout.twig,apps/public/src/Templates/backlog.twig,apps/public/src/Templates/task_detail.twig,apps/public/public/vendor/bootstrap/bootstrap.min.css,apps/public/tests/Controllers/HealthControllerTest.php,apps/public/src/routes.php
+verify: exit 0
+commit: fb7aea0
+learn: Slim 4 CallableResolver auto-instantiates a zero-arg controller via `new $class()` when the container has no factory for it — so HealthController needs no DI factory entry in public/Bootstrap.php (the admin Bootstrap registered one defensively, but it was unnecessary). Slim's RoutingMiddleware also emits 405 for free on any verb not registered against a matched path, so the public 405 invariant (PUB-09) is already half-proven by the routes.php GET-only registrations.
+---
+
+## 41|PUB-09|PASS
++apps/public/tests/Invariants/ReadOnlyTest.php
+verify: exit 0
+commit: 80cc706
+learn: Slim 4's RouteCollector::getRoutes() exposes both the pattern and getMethods() per route, so the invariant is best written as introspection over the live app rather than a hardcoded route list — any future GET route is auto-included, and any accidental non-GET registration (even via $app->map([...])) fails the assertion. For parameterized routes the router resolves 405 before the handler executes, so substituting {id}→x is safe (the ID doesn't need to exist).
+---
+
+## 42|INT-01|PASS
++composer.json,phpunit.xml,tests/integration/bootstrap.php,tests/integration/AdminPublicSharedDataTest.php,AGENTS.md,TASK.md
+verify: exit 0
+commit: ea1ddac
+learn: Booting both Slim apps in-process in one test class is safe even though AppFactory uses a static container — each Bootstrap::boot() rebinds the static container before AppFactory::create() and the returned App keeps its own container reference, so admin and public never collide. Activity-feed assertions against a "no longer contains the old title after update" expectation always fail: NDJSON events are immutable and the public detail page renders historical `data.title=...` payloads verbatim — assert current state via `<h1>` / `<title>` regex instead. INT-01's "+f phpunit.xml" implicitly requires `+m composer.json` to add phpunit/phpunit as a root require-dev (mirrors the controllers-require-bootstrap-registration pattern from earlier phases). Also swept three orphaned AGENTS.md entries (repos-take-camelcase-form-keys, controllers-require-bootstrap-registration, twig-html-attr-mangles-urls) that prior iterations had written but never committed; they were valid project knowledge sitting unstaged across multiple runs.
+---
+
+## 43|INT-02|PASS
++tests/integration/AuditCompletenessTest.php,TASK.md
+verify: exit 0
+commit: bd11d0a
+learn: Two-write audit invariant is best validated via per-route delta counting against EventRepository::streamAll, with one test per (route, branch) pair — POST /tasks/{id}/assign and POST /tasks/{id}/status each fan out into multiple action enums (task.assigned/reassigned/unassigned; task.status_changed/completed), and a single sweep-style test would mask the regression where one branch goes silent. Idempotent removes (Tag/Dependency/SavedView/Roster) emit no event when the row is absent, so the test must first add the relationship in setUp-of-test then remove it — otherwise the assertion sees count=0 and the failure mode looks identical to "no event emitted at all". A meta sweep that asserts the *set* of observed actions equals EventLog::ACTIONS minus `system.reconcile` guards against the orthogonal failure: someone adds a new action enum value but forgets to wire any admin route to emit it.
+---
+
+## 44|INT-03|PASS
++tests/integration/DependencyCycleTest.php,TASK.md
+verify: exit 0
+commit: bcb93d7
+learn: End-to-end cycle-prevention validation needs all three cycle shapes (self-edge, direct 2-cycle, transitive 3-node) plus two negative-control shapes (linear chain, diamond). The diamond test is the load-bearing negative case — a naive `is_reachable($prereq, $task)` check would flag A→B→D + A→C→D as a cycle because D is reachable from A by two paths; the actual DFS in DependencyRepository::wouldCycle only seeks a back-edge to $taskId, which is the correct semantics. Three orthogonal post-conditions per rejected attempt: (1) HTTP 422 + JSON {error:conflict,message:~cycle~}, (2) dependencies.csv unchanged via DependencyRepository::has(), (3) zero `dependency.added` NDJSON lines — the contrapositive of the two-write audit invariant (no CSV write ⇒ no audit row). Self-edge is rejected pre-transaction (line 125 in DependencyRepository) while the other two shapes are caught by the in-transaction DFS — both paths must surface as the same 422 response shape.
+---
+
+## 45|INT-04|PASS
++deploy/httpd-task-tracker.conf,deploy/README.md,TASK.md
+verify: exit 0
+commit: 279ed0d
+learn: Spec §12 dictates the vhost shape exactly — two Listen directives (127.0.0.1:8080 admin, *:80 public) plus matching VirtualHost blocks with Require local / Require all granted. The only place to add value beyond the spec text is operational hardening: FallbackResource /index.php for Slim front-controller routing (avoids depending on .htaccess + mod_rewrite), DirectoryMatch deny blocks for data/logs/tools/lib/vendor/src/tests/vendor (defense-in-depth against DocumentRoot misconfig leaks), and FilesMatch deny for .env / composer.json / composer.lock / phpunit.xml / _schema_version.txt. The !v check only greps for the loopback Listen because that's the load-bearing security boundary — neither the public bind nor the Require directives matter if admin isn't loopback-restricted. README NTFS permissions section uses LocalSystem as the documented default (matches the Apache MSI's out-of-box behavior on Win Server 2016); operators changing to a domain service account just substitute $svc.
+---
+
+## 46|INT-05|PASS
++deploy/smoke.ps1,TASK.md
+verify: exit 0
+commit: cd5e238
+learn: Smoke script must target stock PowerShell 5.1 on Win Server 2016 — that means `Invoke-WebRequest -UseBasicParsing` (no IE engine on Server Core) and a dual catch for the 405 assertion: PS 5.1 throws `System.Net.WebException` (response on `.Exception.Response.StatusCode`), PS 7 throws `Microsoft.PowerShell.Commands.HttpResponseException` (same property path but different type). Casting `[int]` on the StatusCode works for both. The !v is intentionally a static existence + content check, not a live curl, because no Apache is running during Ralph iterations — the script's runtime correctness is implicitly verified by the deploy/README.md §6 contract it mirrors line-for-line. Also useful: parameterize $AdminBase / $PublicBase so operators on a deploy outside the documented C:\inetpub\task-tracker layout can rebind without editing the script.
+---
+
+## 47|INT-06|PASS
++README.md
+verify: exit 0
+commit: 2172f82
+learn: Workspace README is a placement-and-pointers doc — its main job is to surface the three hard invariants (bind-level / code-presence / two-write audit) and route readers to docs/superpowers/specs/2026-05-10-task-tracker-design.md and deploy/README.md rather than duplicate them. Verify command (`grep -q 'task-tracker'`) is a presence check; the real contract is the !c commit-message contract: overview + quickstart + deploy pointer. Quickstart must reflect AGENTS.md p#php-path (PHP at /c/php/php.exe, not on PATH) so a fresh-clone reader doesn't immediately hit "php: command not found".
 ---
