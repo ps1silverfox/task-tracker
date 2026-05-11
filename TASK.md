@@ -243,7 +243,7 @@ deps: ADMIN-01
 !v cd apps/admin && ./vendor/bin/phpunit tests/Controllers/TasksControllerCreateTest.php
 !c feat(admin): TasksController — POST /tasks (create), GET / (list), GET /tasks/{id}
 
-### [ ] ADMIN-03 TasksController — update + soft-delete
+### [x] ADMIN-03 TasksController — update + soft-delete
 +m apps/admin/src/Controllers/TasksController.php
 +f apps/admin/tests/Controllers/TasksControllerUpdateTest.php
 deps: ADMIN-02

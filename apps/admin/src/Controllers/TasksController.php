@@ -11,7 +11,8 @@ use RuntimeException;
 use TaskTracker\Repositories\TaskRepository;
 
 /**
- * Admin tasks controller (ADMIN-02) — POST /tasks (create), GET / (list), GET /tasks/{id} (read).
+ * Admin tasks controller — POST /tasks (create), GET / (list), GET /tasks/{id} (read),
+ * POST /tasks/{id} (update, ADMIN-03), DELETE /tasks/{id} (soft-delete, ADMIN-03).
  *
  * Twig templates land in ADMIN-09; until then list/show emit a minimal inline HTML
  * skeleton so that routing, container wiring, and the two-write audit can be
@@ -20,7 +21,8 @@ use TaskTracker\Repositories\TaskRepository;
  * Error responses follow spec §6: JSON body {error, message}. 422 is used for both
  * missing-required-field (InvalidArgumentException) and conflict (RuntimeException
  * — e.g. duplicate slug) because the spec only enumerates these two failure modes
- * for write endpoints and the distinction is carried in `error`.
+ * for write endpoints and the distinction is carried in `error`. Repository
+ * "not found" RuntimeExceptions map to 404.
  */
 final class TasksController
 {
@@ -105,6 +107,69 @@ final class TasksController
     }
 
     /**
+     * POST /tasks/{id} — partial update. Form fields are sparse: only keys actually
+     * present in the body are forwarded to the repository, so omitted fields keep
+     * their current values (vs. create which defaults missing fields to null).
+     *
+     * @param array<string, string> $args
+     */
+    public function update(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $id = (string) ($args['id'] ?? '');
+        if ($id === '' || $this->tasks->find($id) === null) {
+            return $this->jsonError($response->withStatus(404), 'not_found', "task not found: {$id}");
+        }
+
+        $body = $request->getParsedBody();
+        if (!is_array($body)) {
+            $body = [];
+        }
+
+        try {
+            $task = $this->tasks->update($id, self::normalizeUpdateInput($body));
+        } catch (InvalidArgumentException $e) {
+            return $this->jsonError($response->withStatus(422), 'invalid_field', $e->getMessage());
+        } catch (RuntimeException $e) {
+            // TaskRepository::update raises RuntimeException for both "not found" (a
+            // race after our find() pre-check) and "slug not unique". The 404 vs 422
+            // distinction is duck-typed off the message — see ADMIN-02 docblock.
+            if (str_contains($e->getMessage(), 'not found')) {
+                return $this->jsonError($response->withStatus(404), 'not_found', $e->getMessage());
+            }
+            return $this->jsonError($response->withStatus(422), 'conflict', $e->getMessage());
+        }
+
+        return $response
+            ->withStatus(303)
+            ->withHeader('Location', '/tasks/' . rawurlencode($task->id));
+    }
+
+    /**
+     * DELETE /tasks/{id} — soft-delete (STATUS → `deleted`). Idempotent at the
+     * repository layer; controller redirects to the backlog after either a fresh
+     * delete or a no-op re-delete.
+     *
+     * @param array<string, string> $args
+     */
+    public function delete(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
+    {
+        $id = (string) ($args['id'] ?? '');
+        if ($id === '' || $this->tasks->find($id) === null) {
+            return $this->jsonError($response->withStatus(404), 'not_found', "task not found: {$id}");
+        }
+
+        try {
+            $this->tasks->softDelete($id);
+        } catch (RuntimeException $e) {
+            return $this->jsonError($response->withStatus(404), 'not_found', $e->getMessage());
+        }
+
+        return $response
+            ->withStatus(303)
+            ->withHeader('Location', '/');
+    }
+
+    /**
      * Map spec snake_case form fields to TaskRepository's camelCase input shape.
      *
      * @param array<string, mixed> $body
@@ -125,6 +190,38 @@ final class TasksController
             'assigneeId'  => $body['assignee_id']  ?? null,
             'teamId'      => $body['team_id']      ?? null,
         ];
+    }
+
+    /**
+     * Sparse counterpart to normalizeInput: only forwards keys actually present in
+     * the form body. Required because TaskRepository::update interprets every key
+     * in its $changes array as an explicit set — including null/empty.
+     *
+     * @param array<string, mixed> $body
+     * @return array<string, mixed>
+     */
+    private static function normalizeUpdateInput(array $body): array
+    {
+        $map = [
+            'slug'         => 'slug',
+            'title'        => 'title',
+            'body'         => 'body',
+            'status'       => 'status',
+            'priority'     => 'priority',
+            'due_date'     => 'dueDate',
+            'effort_hours' => 'effortHours',
+            'url'          => 'url',
+            'parent_id'    => 'parentId',
+            'assignee_id'  => 'assigneeId',
+            'team_id'      => 'teamId',
+        ];
+        $out = [];
+        foreach ($map as $formKey => $repoKey) {
+            if (array_key_exists($formKey, $body)) {
+                $out[$repoKey] = $body[$formKey];
+            }
+        }
+        return $out;
     }
 
     private function jsonError(ResponseInterface $response, string $code, string $message): ResponseInterface
