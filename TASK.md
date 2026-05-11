@@ -216,7 +216,7 @@ deps: LIB-04, LIB-05
 !v php tools/reconcile.php --target=tests/integration/.tmp-seed --quiet
 !c feat(tools): reconcile.php — orphan tmp cleanup + CSV/NDJSON drift detection
 
-### [ ] TOOL-04 rotate-logs.php (gzip NDJSON > 30 days)
+### [x] TOOL-04 rotate-logs.php (gzip NDJSON > 30 days)
 +f tools/rotate-logs.php
 +f tests/integration/RotateLogsTest.php
 deps: LIB-05
