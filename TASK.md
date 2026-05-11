@@ -195,7 +195,7 @@ deps: REPO-01, REPO-04
 
 ## Phase 4 — Tools / CLI
 
-### [ ] TOOL-01 seed.php (empty CSVs with headers + example team/member)
+### [x] TOOL-01 seed.php (empty CSVs with headers + example team/member)
 +f tools/seed.php
 +f tests/integration/SeedTest.php
 deps: REPO-01, REPO-02, REPO-03
