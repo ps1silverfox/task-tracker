@@ -7,6 +7,7 @@ use TaskTracker\Public\Controllers\BacklogController;
 use TaskTracker\Public\Controllers\ExecutiveSummaryController;
 use TaskTracker\Public\Controllers\ExportController;
 use TaskTracker\Public\Controllers\GraphController;
+use TaskTracker\Public\Controllers\HealthController;
 use TaskTracker\Public\Controllers\SavedViewsController;
 use TaskTracker\Public\Controllers\TaskDetailController;
 
@@ -34,4 +35,7 @@ return static function (App $app): void {
 
     // PUB-07 saved view application — 302 redirect to /?<filter-as-querystring>.
     $app->get('/views/{id}', [SavedViewsController::class, 'apply']);
+
+    // PUB-08 liveness probe — GET only; smoke.ps1 and Apache monitoring poll this.
+    $app->get('/health', [HealthController::class, 'check']);
 };
