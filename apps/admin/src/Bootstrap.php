@@ -7,13 +7,19 @@ namespace TaskTracker\Admin;
 use Closure;
 use Psr\Container\ContainerInterface;
 use Psr\Container\NotFoundExceptionInterface;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
 use RuntimeException;
 use Slim\App;
+use Slim\Exception\HttpNotFoundException;
 use Slim\Factory\AppFactory;
+use Slim\Psr7\Factory\ResponseFactory;
+use TaskTracker\Admin\Controllers\HealthController;
 use TaskTracker\Admin\Controllers\RosterController;
 use TaskTracker\Admin\Controllers\SavedViewsController;
 use TaskTracker\Admin\Controllers\TasksController;
 use TaskTracker\Admin\Controllers\TeamsController;
+use Throwable;
 use TaskTracker\Aggregations\DependencyGraph;
 use TaskTracker\Aggregations\ExecutiveSummary;
 use TaskTracker\Aggregations\SubProjectRollup;
@@ -69,7 +75,39 @@ final class Bootstrap
         // throws and Slim's HttpNotFoundException surface uniformly.
         $app->addBodyParsingMiddleware();
         $app->addRoutingMiddleware();
-        $app->addErrorMiddleware($displayErrors, true, true);
+        $errorMiddleware = $app->addErrorMiddleware($displayErrors, true, true);
+
+        // ADMIN-08: emit JSON 404s in the same shape repository-level "not found"
+        // already uses ({"error": "not_found", "message": ...}); Slim's HTML
+        // default doesn't match the rest of the admin surface.
+        // Closure intentionally NOT `static`: Slim's CallableResolver rebinds
+        // error handlers to the container via Closure::bind(), which silently
+        // returns null for static closures and trips a TypeError downstream.
+        $errorMiddleware->setErrorHandler(
+            HttpNotFoundException::class,
+            function (
+                ServerRequestInterface $request,
+                Throwable $exception,
+                bool $displayErrorDetails,
+                bool $logErrors,
+                bool $logErrorDetails,
+            ): ResponseInterface {
+                $payload = json_encode(
+                    [
+                        'error'   => 'not_found',
+                        'message' => sprintf(
+                            'route not found: %s %s',
+                            $request->getMethod(),
+                            $request->getUri()->getPath(),
+                        ),
+                    ],
+                    JSON_THROW_ON_ERROR,
+                );
+                $response = (new ResponseFactory())->createResponse(404);
+                $response->getBody()->write($payload);
+                return $response->withHeader('Content-Type', 'application/json; charset=utf-8');
+            },
+        );
 
         (require __DIR__ . '/routes.php')($app);
 
@@ -146,6 +184,7 @@ final class Bootstrap
             SavedViewsController::class => static fn(ContainerInterface $c): SavedViewsController => new SavedViewsController(
                 $c->get(SavedViewRepository::class),
             ),
+            HealthController::class => static fn(): HealthController => new HealthController(),
         ];
     }
 

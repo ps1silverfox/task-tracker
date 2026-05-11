@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use Slim\App;
+use TaskTracker\Admin\Controllers\HealthController;
 use TaskTracker\Admin\Controllers\RosterController;
 use TaskTracker\Admin\Controllers\SavedViewsController;
 use TaskTracker\Admin\Controllers\TasksController;
@@ -41,4 +42,9 @@ return static function (App $app): void {
     $app->get('/saved-views',         [SavedViewsController::class, 'list']);
     $app->post('/saved-views',        [SavedViewsController::class, 'create']);
     $app->delete('/saved-views/{id}', [SavedViewsController::class, 'delete']);
+
+    // ADMIN-08 liveness probe. The 404 handler for unmapped routes is installed
+    // on the ErrorMiddleware in Bootstrap (not as a route) so it also catches
+    // requests whose path doesn't match any registered pattern.
+    $app->get('/health',              [HealthController::class, 'check']);
 };
