@@ -19,6 +19,7 @@ use TaskTracker\Aggregations\DependencyGraph;
 use TaskTracker\Aggregations\ExecutiveSummary;
 use TaskTracker\Aggregations\SubProjectRollup;
 use TaskTracker\Config\Env;
+use TaskTracker\Public\Controllers\BacklogController;
 use TaskTracker\Repositories\DependencyRepository;
 use TaskTracker\Repositories\EventRepository;
 use TaskTracker\Repositories\RosterRepository;
@@ -152,6 +153,13 @@ final class Bootstrap
             DependencyGraph::class => static fn(ContainerInterface $c): DependencyGraph => new DependencyGraph(
                 $c->get(TaskRepository::class),
                 $c->get(DependencyRepository::class),
+            ),
+
+            // Controllers — registered so Slim's CallableResolver can hydrate
+            // [Class::class, 'method'] route handlers via $container->get($id).
+            BacklogController::class => static fn(ContainerInterface $c): BacklogController => new BacklogController(
+                $c->get(TaskRepository::class),
+                $c->get(TagRepository::class),
             ),
         ];
     }
