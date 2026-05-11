@@ -184,7 +184,7 @@ deps: REPO-07
 !v cd lib && ./vendor/bin/phpunit tests/Aggregations/ExecutiveSummaryTest.php
 !c feat(lib): ExecutiveSummary — added/completed/assigned/unassigned by period, person/team filters
 
-### [ ] AGG-03 DependencyGraph (cytoscape JSON serializer)
+### [x] AGG-03 DependencyGraph (cytoscape JSON serializer)
 +f lib/src/Aggregations/DependencyGraph.php
 +f lib/tests/Aggregations/DependencyGraphTest.php
 deps: REPO-01, REPO-04
@@ -202,14 +202,14 @@ deps: REPO-01, REPO-02, REPO-03
 !v php tools/seed.php --target=tests/integration/.tmp-seed && ls tests/integration/.tmp-seed/tasks.csv
 !c feat(tools): seed.php — initialize empty CSVs with headers
 
-### [ ] TOOL-02 migrate.php (writes _schema_version.txt)
+### [x] TOOL-02 migrate.php (writes _schema_version.txt)
 +f tools/migrate.php
 +f tests/integration/MigrateTest.php
 deps: TOOL-01
 !v php tools/migrate.php --target=tests/integration/.tmp-seed && cat tests/integration/.tmp-seed/_schema_version.txt
 !c feat(tools): migrate.php — schema version tracker
 
-### [ ] TOOL-03 reconcile.php (boot-time tmp cleanup + drift detection)
+### [x] TOOL-03 reconcile.php (boot-time tmp cleanup + drift detection)
 +f tools/reconcile.php
 +f tests/integration/ReconcileTest.php
 deps: LIB-04, LIB-05
