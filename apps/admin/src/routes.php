@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 use Slim\App;
+use TaskTracker\Admin\Controllers\TasksController;
 
 return static function (App $app): void {
-    // Routes are registered by later phases (ADMIN-02..ADMIN-08).
-    // Keeping this loader as a closure that mutates $app preserves
-    // a single registration entrypoint for both public/index.php and tests.
-    unset($app);
+    $app->get('/',           [TasksController::class, 'list']);
+    $app->post('/tasks',     [TasksController::class, 'create']);
+    $app->get('/tasks/{id}', [TasksController::class, 'show']);
 };

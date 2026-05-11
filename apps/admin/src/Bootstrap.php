@@ -10,6 +10,7 @@ use Psr\Container\NotFoundExceptionInterface;
 use RuntimeException;
 use Slim\App;
 use Slim\Factory\AppFactory;
+use TaskTracker\Admin\Controllers\TasksController;
 use TaskTracker\Aggregations\DependencyGraph;
 use TaskTracker\Aggregations\ExecutiveSummary;
 use TaskTracker\Aggregations\SubProjectRollup;
@@ -59,9 +60,11 @@ final class Bootstrap
         AppFactory::setContainer($container);
         $app = AppFactory::create();
 
-        // Order: routing first (innermost), then error (outermost) — error
-        // middleware then catches both route-handler throws and Slim's
-        // HttpNotFoundException uniformly.
+        // Order matters: BodyParsing (innermost) → Routing → Error (outermost).
+        // BodyParsing must precede Routing so route handlers see a parsed array
+        // for form-urlencoded / JSON POSTs; Error wraps everything so handler
+        // throws and Slim's HttpNotFoundException surface uniformly.
+        $app->addBodyParsingMiddleware();
         $app->addRoutingMiddleware();
         $app->addErrorMiddleware($displayErrors, true, true);
 
@@ -123,6 +126,11 @@ final class Bootstrap
                 $c->get(TaskRepository::class),
                 $c->get(DependencyRepository::class),
             ),
+
+            // Controllers — registered so Slim's CallableResolver can hydrate
+            // [Class::class, 'method'] route handlers via $container->get($id).
+            TasksController::class => static fn(ContainerInterface $c): TasksController
+                => new TasksController($c->get(TaskRepository::class)),
         ];
     }
 

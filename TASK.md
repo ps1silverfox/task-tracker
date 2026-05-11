@@ -227,7 +227,7 @@ deps: LIB-05
 
 ## Phase 5 — Admin app (apps/admin/) — full CRUD
 
-### [ ] ADMIN-01 Admin app bootstrap (DI container, middleware, error handler)
+### [x] ADMIN-01 Admin app bootstrap (DI container, middleware, error handler)
 +f apps/admin/src/Bootstrap.php
 +f apps/admin/tests/BootstrapTest.php
 +m apps/admin/public/index.php
@@ -235,7 +235,7 @@ deps: INIT-03, REPO-01
 !v cd apps/admin && ./vendor/bin/phpunit tests/BootstrapTest.php
 !c feat(admin): Slim bootstrap + DI container wiring
 
-### [ ] ADMIN-02 TasksController — create + list + read
+### [x] ADMIN-02 TasksController — create + list + read
 +f apps/admin/src/Controllers/TasksController.php
 +f apps/admin/tests/Controllers/TasksControllerCreateTest.php
 +m apps/admin/src/routes.php
