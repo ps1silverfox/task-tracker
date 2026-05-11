@@ -411,13 +411,13 @@ deps: INT-01
 !v ./vendor/bin/phpunit tests/integration/AuditCompletenessTest.php
 !c test(integration): invariant — every state-changing admin route writes an NDJSON event
 
-### [ ] INT-03 Cycle-prevention integration test
+### [x] INT-03 Cycle-prevention integration test
 +f tests/integration/DependencyCycleTest.php
 deps: INT-01
 !v ./vendor/bin/phpunit tests/integration/DependencyCycleTest.php
 !c test(integration): invariant — cycle-creating dependency returns 422
 
-### [ ] INT-04 Apache vhost config + deploy README
+### [x] INT-04 Apache vhost config + deploy README
 +f deploy/httpd-task-tracker.conf
 +f deploy/README.md
 deps: INT-01
