@@ -104,7 +104,7 @@ deps: LIB-02
 
 ## Phase 2 — Domain models & repositories
 
-### [ ] MODEL-01 Page/Task model + Roster + Team + Event + SavedView
+### [x] MODEL-01 Page/Task model + Roster + Team + Event + SavedView
 +f lib/src/Models/Task.php
 +f lib/src/Models/RosterMember.php
 +f lib/src/Models/Team.php
@@ -117,7 +117,7 @@ deps: LIB-04
 !v cd lib && ./vendor/bin/phpunit tests/Models
 !c feat(lib): domain models — Task, RosterMember, Team, Event, SavedView + enums (status, priority)
 
-### [ ] REPO-01 TaskRepository CRUD
+### [x] REPO-01 TaskRepository CRUD
 +f lib/src/Repositories/TaskRepository.php
 +f lib/tests/Repositories/TaskRepositoryTest.php
 deps: MODEL-01, LIB-04, LIB-05
