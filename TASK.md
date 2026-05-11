@@ -124,7 +124,7 @@ deps: MODEL-01, LIB-04, LIB-05
 !v cd lib && ./vendor/bin/phpunit tests/Repositories/TaskRepositoryTest.php
 !c feat(lib): TaskRepository — full CRUD, FIRST_ASSIGNED_AT and LAST_ASSIGNMENT_CHANGE_AT semantics
 
-### [ ] REPO-02 RosterRepository
+### [x] REPO-02 RosterRepository
 +f lib/src/Repositories/RosterRepository.php
 +f lib/tests/Repositories/RosterRepositoryTest.php
 deps: MODEL-01, LIB-04
