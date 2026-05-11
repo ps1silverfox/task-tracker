@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Slim\App;
 use TaskTracker\Admin\Controllers\RosterController;
+use TaskTracker\Admin\Controllers\SavedViewsController;
 use TaskTracker\Admin\Controllers\TasksController;
 use TaskTracker\Admin\Controllers\TeamsController;
 
@@ -34,4 +35,10 @@ return static function (App $app): void {
     $app->get('/teams',               [TeamsController::class, 'list']);
     $app->post('/teams',              [TeamsController::class, 'create']);
     $app->post('/teams/{id}',         [TeamsController::class, 'update']);
+
+    // ADMIN-07 saved-views routes. No update verb: closed event enum admits only
+    // saved_view.created and saved_view.deleted (spec §381-382).
+    $app->get('/saved-views',         [SavedViewsController::class, 'list']);
+    $app->post('/saved-views',        [SavedViewsController::class, 'create']);
+    $app->delete('/saved-views/{id}', [SavedViewsController::class, 'delete']);
 };

@@ -11,6 +11,7 @@ use RuntimeException;
 use Slim\App;
 use Slim\Factory\AppFactory;
 use TaskTracker\Admin\Controllers\RosterController;
+use TaskTracker\Admin\Controllers\SavedViewsController;
 use TaskTracker\Admin\Controllers\TasksController;
 use TaskTracker\Admin\Controllers\TeamsController;
 use TaskTracker\Aggregations\DependencyGraph;
@@ -141,6 +142,9 @@ final class Bootstrap
             ),
             TeamsController::class => static fn(ContainerInterface $c): TeamsController => new TeamsController(
                 $c->get(TeamRepository::class),
+            ),
+            SavedViewsController::class => static fn(ContainerInterface $c): SavedViewsController => new SavedViewsController(
+                $c->get(SavedViewRepository::class),
             ),
         ];
     }

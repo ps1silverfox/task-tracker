@@ -265,7 +265,7 @@ deps: ADMIN-01, REPO-02
 !v cd apps/admin && ./vendor/bin/phpunit tests/Controllers/RosterControllerTest.php
 !c feat(admin): RosterController — add/update/deactivate
 
-### [ ] ADMIN-06 TeamsController
+### [x] ADMIN-06 TeamsController
 +f apps/admin/src/Controllers/TeamsController.php
 +f apps/admin/tests/Controllers/TeamsControllerTest.php
 +m apps/admin/src/routes.php
@@ -273,7 +273,7 @@ deps: ADMIN-01, REPO-03
 !v cd apps/admin && ./vendor/bin/phpunit tests/Controllers/TeamsControllerTest.php
 !c feat(admin): TeamsController — create/update
 
-### [ ] ADMIN-07 SavedViewsController
+### [x] ADMIN-07 SavedViewsController
 +f apps/admin/src/Controllers/SavedViewsController.php
 +f apps/admin/tests/Controllers/SavedViewsControllerTest.php
 +m apps/admin/src/routes.php
