@@ -45,7 +45,7 @@ deps: INIT-02
 !v cd apps/public && composer install --no-interaction && ./vendor/bin/phpunit tests/Sanity
 !c chore(public): scaffold Slim 4 public app (no write routes)
 
-### [ ] INIT-05 .env.example + phpdotenv loader in shared lib
+### [x] INIT-05 .env.example + phpdotenv loader in shared lib
 +f .env.example
 +f lib/src/Config/Env.php
 +f lib/tests/Config/EnvTest.php
@@ -53,7 +53,7 @@ deps: INIT-02
 !v cd lib && ./vendor/bin/phpunit tests/Config
 !c chore(lib): env loader (DATA_DIR, LOG_DIR, SMTP_*, BASE_URL, TIMEZONE)
 
-### [ ] INIT-06 data/ + logs/ placeholder directories
+### [x] INIT-06 data/ + logs/ placeholder directories
 +f data/.gitkeep
 +f logs/.gitkeep
 +m .gitignore
@@ -65,28 +65,28 @@ deps: INIT-01
 
 ## Phase 1 — Storage primitives (lib/)
 
-### [ ] LIB-01 Uuid7 generator
+### [x] LIB-01 Uuid7 generator
 +f lib/src/Util/Uuid7.php
 +f lib/tests/Util/Uuid7Test.php
 deps: INIT-02
 !v cd lib && ./vendor/bin/phpunit tests/Util/Uuid7Test.php
 !c feat(lib): UUID v7 generator (time-ordered, lexicographically sortable)
 
-### [ ] LIB-02 IsoTime UTC helper
+### [x] LIB-02 IsoTime UTC helper
 +f lib/src/Util/IsoTime.php
 +f lib/tests/Util/IsoTimeTest.php
 deps: INIT-02
 !v cd lib && ./vendor/bin/phpunit tests/Util/IsoTimeTest.php
 !c feat(lib): IsoTime UTC formatter
 
-### [ ] LIB-03 CsvInjectionGuard
+### [x] LIB-03 CsvInjectionGuard
 +f lib/src/Util/CsvInjectionGuard.php
 +f lib/tests/Util/CsvInjectionGuardTest.php
 deps: INIT-02
 !v cd lib && ./vendor/bin/phpunit tests/Util/CsvInjectionGuardTest.php
 !c feat(lib): CSV injection guard (prefix =/+/-/@/tab/CR cells with apostrophe)
 
-### [ ] LIB-04 CsvStore (read/write/flock/atomic-rename)
+### [x] LIB-04 CsvStore (read/write/flock/atomic-rename)
 +f lib/src/Storage/CsvStore.php
 +f lib/tests/Storage/CsvStoreTest.php
 deps: LIB-01, LIB-02
