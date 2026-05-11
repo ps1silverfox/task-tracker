@@ -152,7 +152,7 @@ deps: MODEL-01, LIB-04
 !v cd lib && ./vendor/bin/phpunit tests/Repositories/TagRepositoryTest.php
 !c feat(lib): TagRepository
 
-### [ ] REPO-06 SavedViewRepository
+### [x] REPO-06 SavedViewRepository
 +f lib/src/Repositories/SavedViewRepository.php
 +f lib/tests/Repositories/SavedViewRepositoryTest.php
 deps: MODEL-01, LIB-04
