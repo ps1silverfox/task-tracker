@@ -397,7 +397,7 @@ deps: PUB-02, PUB-03, PUB-04, PUB-05, PUB-06, PUB-07
 
 ## Phase 7 — Integration, deploy, hardening
 
-### [ ] INT-01 Integration test harness (boot both apps in-process)
+### [x] INT-01 Integration test harness (boot both apps in-process)
 +f tests/integration/bootstrap.php
 +f tests/integration/AdminPublicSharedDataTest.php
 +f phpunit.xml
