@@ -21,6 +21,7 @@ use TaskTracker\Aggregations\SubProjectRollup;
 use TaskTracker\Config\Env;
 use TaskTracker\Public\Controllers\BacklogController;
 use TaskTracker\Public\Controllers\ExecutiveSummaryController;
+use TaskTracker\Public\Controllers\ExportController;
 use TaskTracker\Public\Controllers\TaskDetailController;
 use TaskTracker\Repositories\DependencyRepository;
 use TaskTracker\Repositories\EventRepository;
@@ -185,6 +186,11 @@ final class Bootstrap
             ExecutiveSummaryController::class => static fn(ContainerInterface $c): ExecutiveSummaryController => new ExecutiveSummaryController(
                 $c->get(ExecutiveSummary::class),
                 $c->get(Environment::class),
+            ),
+            ExportController::class => static fn(ContainerInterface $c): ExportController => new ExportController(
+                $c->get(TaskRepository::class),
+                $c->get(TagRepository::class),
+                $c->get(ExecutiveSummary::class),
             ),
         ];
     }

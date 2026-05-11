@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Slim\App;
 use TaskTracker\Public\Controllers\BacklogController;
 use TaskTracker\Public\Controllers\ExecutiveSummaryController;
+use TaskTracker\Public\Controllers\ExportController;
 use TaskTracker\Public\Controllers\TaskDetailController;
 
 return static function (App $app): void {
@@ -20,4 +21,8 @@ return static function (App $app): void {
 
     // PUB-04 executive time-series summary (HTML + embedded Chart.js).
     $app->get('/summary', [ExecutiveSummaryController::class, 'show']);
+
+    // PUB-05 CSV exports (filtered backlog + summary buckets) with injection guard.
+    $app->get('/tasks.csv',   [ExportController::class, 'tasks']);
+    $app->get('/summary.csv', [ExportController::class, 'summary']);
 };
