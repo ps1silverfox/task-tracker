@@ -165,3 +165,73 @@ verify: exit 0
 commit: e24ca14
 learn: Action routes intentionally live BELOW the catch-all /tasks/{id} pair in routes.php — Slim 4's FastRoute dispatcher matches by segment count, so /tasks/{id}/assign (3 segments) and /tasks/{id} (2 segments) never collide regardless of registration order. Reused TaskRepository::update() for /assign and /status rather than adding bespoke repo methods so FIRST_ASSIGNED_AT / COMPLETED_AT semantics and the task.assigned/status_changed event emission stayed in one place. /status is validated against STATUSES_LIVE (not STATUSES) so `deleted` cannot be reached via the status endpoint — soft-delete remains the sole responsibility of DELETE /tasks/{id}. Dependency add and remove both return 303 even when idempotent-no-op so the PRG redirect contract is uniform; the cycle/duplicate cases return 422 conflict and leave the CSV untouched (verified inside the txn closure under exclusive flock — no TOCTOU window).
 ---
+
+## 27|ADMIN-05|PASS
++apps/admin/src/Controllers/RosterController.php,apps/admin/tests/Controllers/RosterControllerTest.php,apps/admin/src/routes.php,apps/admin/src/Bootstrap.php,TASK.md
+verify: exit 0
+commit: 24201c1
+learn: roster has no reactivate path because EventLog action enum is closed — controller cannot accept ACTIVE in update body
+---
+
+## 28|ADMIN-06|PASS
++apps/admin/src/Controllers/TeamsController.php,apps/admin/tests/Controllers/TeamsControllerTest.php,apps/admin/src/routes.php,apps/admin/src/Bootstrap.php
+verify: exit 0
+commit: b7583e2
+learn: Bootstrap.php DI factory must be added for every new controller even when not listed in +m; Slim's CallableResolver only injects when the FQCN is registered.
+---
+
+## 29|ADMIN-07|PASS
++apps/admin/src/Controllers/SavedViewsController.php,apps/admin/tests/Controllers/SavedViewsControllerTest.php,apps/admin/src/Bootstrap.php,apps/admin/src/routes.php,TASK.md
+verify: exit 0
+commit: 70dff0d
+learn: SavedViewRepository deliberately omits update() because the audit action enum admits only saved_view.created and saved_view.deleted — controller mirrors this with no PATCH/PUT verb. Initial test asserted on raw CSV substring "status":["open","in_progress"] but RFC 4180 doubles embedded quotes (""status""), so the substring never matched. Two cleaner options: assert on quote-free fragments (e.g. "open"), or round-trip through repository->findByName() and compare decoded filter — chose the latter for clarity. Slim's body-parsing middleware delivers nested form arrays (filter[status][]=open) and JSON-body objects to the controller in identical shape, so passing $body['filter'] straight to the repository works for both client transports without branching.
+---
+
+## 30|ADMIN-08|PASS
++apps/admin/src/Controllers/HealthController.php,apps/admin/tests/Controllers/HealthControllerTest.php,apps/admin/src/Bootstrap.php,apps/admin/src/routes.php
+verify: exit 0
+commit: a55df10
+learn: Slim 4's ErrorMiddleware::setErrorHandler() routes the supplied callable through CallableResolver::bindToContainer(), which calls Closure::bind($cl, $container). Closure::bind() silently returns null for static closures (and emits a PHP warning "Cannot bind an instance to a static closure"), and the subsequent return type check then fails with "Slim\CallableResolver::bindToContainer(): Return value must be of type callable, null returned". Drop the `static` keyword on error-handler closures even when they capture no $this — otherwise every triggered Slim error during a request throws a TypeError instead of running the handler. The default 404 from Slim returns text/html with the framework's stock page; replacing it with a JSON {"error":"not_found","message":...} response keeps the admin surface consistent with the per-resource not-found responses already emitted by TasksController/RosterController/TeamsController/SavedViewsController.
+---
+
+## 31|ADMIN-09|PASS
++apps/admin/composer.json,apps/admin/src/Bootstrap.php,apps/admin/src/Templates/layout.twig,apps/admin/src/Templates/backlog.twig,apps/admin/src/Templates/task_edit.twig,apps/admin/src/Templates/roster.twig,apps/admin/src/Templates/teams.twig,apps/admin/public/vendor/bootstrap/bootstrap.min.css,apps/admin/tests/RenderingTest.php
+verify: exit 0
+commit: c3630f7
+learn: Twig autoescapes by file extension — `.twig` defaults to html context — so the existing htmlspecialchars discipline in TasksController is matched without extra config; `strict_variables: true` is worth the cost (one inline `{% set %}` for status-colour map per template) because it catches typos at render time instead of leaving silent gaps. Whitespace-tolerant regex assertions (`/>\s*Create\s*</`) survive Twig's indentation-preserving render of {% if %} blocks inside element bodies — `assertStringContainsString('>Create<', …)` does not.
+---
+
+## 32|ADMIN-10|PASS
++lib/composer.json,lib/src/Mail/SmtpMailer.php,lib/tests/Mail/SmtpMailerTest.php,apps/admin/composer.json,apps/admin/src/Services/NotificationService.php,apps/admin/tests/Services/NotificationServiceTest.php,TASK.md
+verify: exit 0
+commit: df62322
+learn: SmtpMailer lives in lib/ but the public app must not have symfony/mailer per spec §11 — solved by keeping symfony/mailer in lib's require-dev (so SmtpMailerTest still runs from lib/) and admin's require (runtime); the public app installs neither because composer path-repo deps don't cascade require-dev. SmtpMailer accepts `?MailerInterface` for test injection — the env-driven Transport::fromDsn() path only fires when no spy is passed. NotificationService date math stays in `Y-m-d` strings because Task::dueDate is opaque text from the CSV and ISO date lex-compare is correct — switching to DateTimeImmutable would invite TZ drift. TaskRepository::create takes camelCase keys (dueDate, assigneeId) — only the controllers do snake_case→camelCase translation, so service-level tests must use camelCase or fields silently become null.
+---
+
+## 33|PUB-01|PASS
++apps/public/src/Bootstrap.php,apps/public/tests/BootstrapTest.php,apps/public/public/index.php
+verify: exit 0
+commit: a145938
+learn: apps/public/vendor/task-tracker/core was a stale May-10 mirror containing only the INIT-04 .gitkeep — `composer update task-tracker/core` was required to refresh the path-repo before the test could see Config\Env, Storage\*, Repositories\*, Aggregations\*. The composer.json `path` repository with `symlink: false` copies dist artifacts at install time, so when lib/ gains files later, only an explicit update re-mirrors them. Mirrored admin's anonymous-class PSR-11 container instead of pulling php-di. JSON 404 handler closure must be non-static (same trap as admin: Slim's CallableResolver::bindToContainer silently returns null for static closures, throwing TypeError downstream). Public DI deliberately omits Twig (composer.json doesn't list twig/twig yet — PUB-08 will add), mailer, and controllers. Repositories are wired with EventLog so their constructors satisfy, but no controller exists to invoke write paths — code-presence separation holds via absence of controllers, not via narrower repository wiring.
+---
+
+## 34|PUB-02|PASS
++apps/public/src/Controllers/BacklogController.php,apps/public/tests/Controllers/BacklogControllerTest.php,apps/public/src/Bootstrap.php,apps/public/src/routes.php,TASK.md
+verify: exit 0
+commit: b422448
+learn: Tri-state parsing for nullable single-value filter axes (team_id, assignee_id, parent_id) — absent vs. present-empty vs. present-value — needs a discriminator beyond `?string` because PHP's null encodes both "no filter" and "match IS NULL". A {set: bool, value: ?string} pair preserves the distinction. Default-hide `done` only fires when the `status` query key is absent; explicit `?status=done` must override the include_done default so the saved-views URL can pin completed-only views without forcing include_done into every link. Slim's RoutingMiddleware writes its 405 stack trace to stderr via the ErrorMiddleware (`$logErrors=true` in Bootstrap), which means phpunit's `beStrictAboutOutputDuringTests` doesn't trip — but the noise prints on every non-GET assertion. To silence it later, the cleanest fix is to register a custom HttpMethodNotAllowedException handler that doesn't log; not in scope here.
+---
+
+## 35|PUB-03|PASS
++apps/public/src/Controllers/TaskDetailController.php,apps/public/tests/Controllers/TaskDetailControllerTest.php,apps/public/src/Bootstrap.php,apps/public/src/routes.php,TASK.md
+verify: exit 0
+commit: 831ba63
+learn: EventRepository::listForTask() already streams every NDJSON file lexicographically (= chronologically by UTC date), filters by taskId, and returns events oldest-first — the controller only formats. This is the payoff of REPO-07's choice to expose a per-task convenience method on top of streamAll(): PUB-03 never has to know about file boundaries or daily rotation. Driving the activity-feed test through TaskRepository::create()+update() (rather than poking EventLog::append() directly) validates the real audit emission path — if a repo method ever drops its `safeEmit` call, the public detail page would also lose the corresponding event and the test catches it. Substring-order assertions via strpos() decouple the chronological-ordering test from any later Twig template swap in PUB-08. Soft-deleted tasks must return 404 on the public surface — the row is retained in CSV for admin reference-resolution, but the public app has no use for tombstones and exposing them would leak retired titles/bodies.
+---
+
+## 36|PUB-04|PASS
++apps/public/composer.json,apps/public/src/Bootstrap.php,apps/public/src/routes.php,apps/public/src/Controllers/ExecutiveSummaryController.php,apps/public/src/Templates/summary.twig,apps/public/public/vendor/chartjs/chart.umd.min.js,apps/public/tests/Controllers/ExecutiveSummaryControllerTest.php,TASK.md
+verify: exit 0
+commit: PENDING
+learn: ExecutiveSummary already pre-fills zero-count buckets for every period in [from,to], so the controller never has to fill gaps — the template can iterate `rows` and Chart.js gets a continuous x-axis for free. PUB-04 introduces Twig to apps/public/ (was admin-only previously); summary.twig is intentionally standalone (no extends) because layout.twig is +f'd by PUB-08 — extending a not-yet-existent template would crash the template loader. Chart.js 4.4.7 UMD bundle from jsDelivr is MIT-licensed; copied locally per the no-CDN deploy rule. data-* attributes carry the series as JSON-encoded attributes so the inline <script> can parse them with JSON.parse without templating into a JS literal context (eliminates a whole class of XSS).
+---

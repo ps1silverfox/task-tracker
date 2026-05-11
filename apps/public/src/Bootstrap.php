@@ -20,6 +20,7 @@ use TaskTracker\Aggregations\ExecutiveSummary;
 use TaskTracker\Aggregations\SubProjectRollup;
 use TaskTracker\Config\Env;
 use TaskTracker\Public\Controllers\BacklogController;
+use TaskTracker\Public\Controllers\ExecutiveSummaryController;
 use TaskTracker\Public\Controllers\TaskDetailController;
 use TaskTracker\Repositories\DependencyRepository;
 use TaskTracker\Repositories\EventRepository;
@@ -30,6 +31,8 @@ use TaskTracker\Repositories\TaskRepository;
 use TaskTracker\Repositories\TeamRepository;
 use TaskTracker\Storage\CsvStore;
 use TaskTracker\Storage\EventLog;
+use Twig\Environment;
+use Twig\Loader\FilesystemLoader;
 
 /**
  * Public Slim app bootstrap (PUB-01).
@@ -156,6 +159,19 @@ final class Bootstrap
                 $c->get(DependencyRepository::class),
             ),
 
+            // Twig environment for the public UI templates (PUB-04 onward).
+            // strict_variables surfaces template typos as exceptions instead of
+            // silently rendering empty strings; autoescape='html' keeps any
+            // future user-supplied data XSS-safe by default.
+            Environment::class => static fn(): Environment => new Environment(
+                new FilesystemLoader(__DIR__ . '/Templates'),
+                [
+                    'strict_variables' => true,
+                    'autoescape'       => 'html',
+                    'cache'            => false,
+                ],
+            ),
+
             // Controllers — registered so Slim's CallableResolver can hydrate
             // [Class::class, 'method'] route handlers via $container->get($id).
             BacklogController::class => static fn(ContainerInterface $c): BacklogController => new BacklogController(
@@ -165,6 +181,10 @@ final class Bootstrap
             TaskDetailController::class => static fn(ContainerInterface $c): TaskDetailController => new TaskDetailController(
                 $c->get(TaskRepository::class),
                 $c->get(EventRepository::class),
+            ),
+            ExecutiveSummaryController::class => static fn(ContainerInterface $c): ExecutiveSummaryController => new ExecutiveSummaryController(
+                $c->get(ExecutiveSummary::class),
+                $c->get(Environment::class),
             ),
         ];
     }

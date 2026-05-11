@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Executive Summary &middot; Task Tracker</title>
+    <meta name="generator" content="task-tracker-public">
+</head>
+<body>
+<header>
+    <h1>Executive Summary</h1>
+    <p class="meta">
+        Period: <code>{{ period }}</code>
+        &middot; From: <time>{{ from }}</time>
+        &middot; To: <time>{{ to }}</time>
+        {%- if person %} &middot; Person: <code>{{ person }}</code>{% endif -%}
+        {%- if team %} &middot; Team: <code>{{ team }}</code>{% endif -%}
+    </p>
+</header>
+
+<form method="get" action="/summary" class="filters">
+    <label>Period
+        <select name="period">
+            <option value="day"     {% if period == 'day' %}selected{% endif %}>day</option>
+            <option value="month"   {% if period == 'month' %}selected{% endif %}>month</option>
+            <option value="quarter" {% if period == 'quarter' %}selected{% endif %}>quarter</option>
+            <option value="year"    {% if period == 'year' %}selected{% endif %}>year</option>
+        </select>
+    </label>
+    <label>From <input type="date" name="from" value="{{ from }}"></label>
+    <label>To   <input type="date" name="to"   value="{{ to }}"></label>
+    <label>Person <input type="text" name="person" value="{{ person|default('') }}" placeholder="roster id"></label>
+    <label>Team   <input type="text" name="team"   value="{{ team|default('') }}"   placeholder="team id"></label>
+    <button type="submit">Apply</button>
+    <a href="/summary.csv?period={{ period|url_encode }}&from={{ from|url_encode }}&to={{ to|url_encode }}{% if person %}&person={{ person|url_encode }}{% endif %}{% if team %}&team={{ team|url_encode }}{% endif %}">CSV</a>
+</form>
+
+<section class="chart">
+    <canvas id="summary-chart" width="900" height="320"
+            data-labels="{{ series.labels|json_encode|e('html_attr') }}"
+            data-added="{{ series.added|json_encode|e('html_attr') }}"
+            data-completed="{{ series.completed|json_encode|e('html_attr') }}"
+            data-assigned="{{ series.assigned|json_encode|e('html_attr') }}"
+            data-unassigned="{{ series.unassigned|json_encode|e('html_attr') }}"></canvas>
+</section>
+
+<section class="table">
+    <table id="summary-table">
+        <thead>
+            <tr>
+                <th>Period</th>
+                <th>Added</th>
+                <th>Completed</th>
+                <th>Assigned</th>
+                <th>Unassigned</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% if rows is empty %}
+            <tr class="empty"><td colspan="5">No events in range.</td></tr>
+        {% else %}
+            {% for row in rows %}
+            <tr data-period="{{ row.period }}">
+                <td>{{ row.period }}</td>
+                <td>{{ row.added }}</td>
+                <td>{{ row.completed }}</td>
+                <td>{{ row.assigned }}</td>
+                <td>{{ row.unassigned }}</td>
+            </tr>
+            {% endfor %}
+        {% endif %}
+        </tbody>
+    </table>
+</section>
+
+<script src="/vendor/chartjs/chart.umd.min.js"></script>
+<script>
+(function () {
+    var canvas = document.getElementById('summary-chart');
+    if (!canvas || typeof Chart === 'undefined') { return; }
+    var labels     = JSON.parse(canvas.getAttribute('data-labels')     || '[]');
+    var added      = JSON.parse(canvas.getAttribute('data-added')      || '[]');
+    var completed  = JSON.parse(canvas.getAttribute('data-completed')  || '[]');
+    var assigned   = JSON.parse(canvas.getAttribute('data-assigned')   || '[]');
+    var unassigned = JSON.parse(canvas.getAttribute('data-unassigned') || '[]');
+    new Chart(canvas.getContext('2d'), {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                { label: 'Added',      data: added,      backgroundColor: '#3b82f6' },
+                { label: 'Completed',  data: completed,  backgroundColor: '#10b981' },
+                { label: 'Assigned',   data: assigned,   backgroundColor: '#f59e0b' },
+                { label: 'Unassigned', data: unassigned, backgroundColor: '#ef4444' }
+            ]
+        },
+        options: {
+            responsive: false,
+            scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
+            plugins: { legend: { position: 'top' } }
+        }
+    });
+})();
+</script>
+</body>
+</html>

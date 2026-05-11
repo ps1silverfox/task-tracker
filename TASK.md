@@ -314,7 +314,7 @@ deps: ADMIN-04
 
 ## Phase 6 — Public app (apps/public/) — read-only
 
-### [ ] PUB-01 Public app bootstrap (no write routes registered)
+### [x] PUB-01 Public app bootstrap (no write routes registered)
 +f apps/public/src/Bootstrap.php
 +f apps/public/tests/BootstrapTest.php
 +m apps/public/public/index.php
@@ -322,7 +322,7 @@ deps: INIT-04, REPO-01
 !v cd apps/public && ./vendor/bin/phpunit tests/BootstrapTest.php
 !c feat(public): Slim bootstrap — read-only DI, no write controllers
 
-### [ ] PUB-02 BacklogController + query-string filters
+### [x] PUB-02 BacklogController + query-string filters
 +f apps/public/src/Controllers/BacklogController.php
 +f apps/public/tests/Controllers/BacklogControllerTest.php
 +m apps/public/src/routes.php
@@ -330,7 +330,7 @@ deps: PUB-01
 !v cd apps/public && ./vendor/bin/phpunit tests/Controllers/BacklogControllerTest.php
 !c feat(public): BacklogController — GET / with filtering
 
-### [ ] PUB-03 Task detail with activity feed
+### [x] PUB-03 Task detail with activity feed
 +f apps/public/src/Controllers/TaskDetailController.php
 +f apps/public/tests/Controllers/TaskDetailControllerTest.php
 +m apps/public/src/routes.php
@@ -338,7 +338,7 @@ deps: PUB-01, REPO-07
 !v cd apps/public && ./vendor/bin/phpunit tests/Controllers/TaskDetailControllerTest.php
 !c feat(public): GET /tasks/{id} — read-only detail + activity feed from event log
 
-### [ ] PUB-04 ExecutiveSummaryController + Chart.js
+### [x] PUB-04 ExecutiveSummaryController + Chart.js
 +f apps/public/src/Controllers/ExecutiveSummaryController.php
 +f apps/public/public/vendor/chartjs/chart.umd.min.js
 +f apps/public/src/Templates/summary.twig

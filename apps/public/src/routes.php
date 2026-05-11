@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 use Slim\App;
 use TaskTracker\Public\Controllers\BacklogController;
+use TaskTracker\Public\Controllers\ExecutiveSummaryController;
 use TaskTracker\Public\Controllers\TaskDetailController;
 
 return static function (App $app): void {
@@ -16,4 +17,7 @@ return static function (App $app): void {
 
     // PUB-03 read-only task detail + activity feed.
     $app->get('/tasks/{id}', [TaskDetailController::class, 'show']);
+
+    // PUB-04 executive time-series summary (HTML + embedded Chart.js).
+    $app->get('/summary', [ExecutiveSummaryController::class, 'show']);
 };
