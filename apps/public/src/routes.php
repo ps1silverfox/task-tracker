@@ -7,6 +7,7 @@ use TaskTracker\Public\Controllers\BacklogController;
 use TaskTracker\Public\Controllers\ExecutiveSummaryController;
 use TaskTracker\Public\Controllers\ExportController;
 use TaskTracker\Public\Controllers\GraphController;
+use TaskTracker\Public\Controllers\SavedViewsController;
 use TaskTracker\Public\Controllers\TaskDetailController;
 
 return static function (App $app): void {
@@ -30,4 +31,7 @@ return static function (App $app): void {
     // PUB-06 dependency visualizer page + JSON data endpoint.
     $app->get('/graph',      [GraphController::class, 'page']);
     $app->get('/graph.json', [GraphController::class, 'json']);
+
+    // PUB-07 saved view application — 302 redirect to /?<filter-as-querystring>.
+    $app->get('/views/{id}', [SavedViewsController::class, 'apply']);
 };

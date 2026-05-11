@@ -23,6 +23,7 @@ use TaskTracker\Public\Controllers\BacklogController;
 use TaskTracker\Public\Controllers\ExecutiveSummaryController;
 use TaskTracker\Public\Controllers\ExportController;
 use TaskTracker\Public\Controllers\GraphController;
+use TaskTracker\Public\Controllers\SavedViewsController;
 use TaskTracker\Public\Controllers\TaskDetailController;
 use TaskTracker\Repositories\DependencyRepository;
 use TaskTracker\Repositories\EventRepository;
@@ -196,6 +197,9 @@ final class Bootstrap
             GraphController::class => static fn(ContainerInterface $c): GraphController => new GraphController(
                 $c->get(DependencyGraph::class),
                 $c->get(Environment::class),
+            ),
+            SavedViewsController::class => static fn(ContainerInterface $c): SavedViewsController => new SavedViewsController(
+                $c->get(SavedViewRepository::class),
             ),
         ];
     }
