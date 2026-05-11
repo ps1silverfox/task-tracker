@@ -159,7 +159,7 @@ deps: MODEL-01, LIB-04
 !v cd lib && ./vendor/bin/phpunit tests/Repositories/SavedViewRepositoryTest.php
 !c feat(lib): SavedViewRepository — JSON-blob filter storage
 
-### [ ] REPO-07 EventRepository (NDJSON read for activity feed)
+### [x] REPO-07 EventRepository (NDJSON read for activity feed)
 +f lib/src/Repositories/EventRepository.php
 +f lib/tests/Repositories/EventRepositoryTest.php
 deps: LIB-05, MODEL-01
