@@ -1,0 +1,17 @@
+/vendor/
+/apps/*/vendor/
+/lib/vendor/
+/node_modules/
+/composer.lock
+/data/*.csv
+/data/_schema_version.txt
+!/data/.gitkeep
+/logs/*.ndjson
+/logs/*.log
+/logs/archive/
+!/logs/.gitkeep
+/.phpunit.cache/
+/.phpunit.result.cache
+*.tmp.*
+.env
+.env.local
