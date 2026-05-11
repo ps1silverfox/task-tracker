@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 require __DIR__ . '/../vendor/autoload.php';
 
-use Slim\Factory\AppFactory;
+use TaskTracker\Public\Bootstrap;
+use TaskTracker\Config\Env;
 
-$app = AppFactory::create();
+$projectRoot = dirname(__DIR__, 3);
+$env = Env::fromEnvironment($projectRoot, $projectRoot);
 
-(require __DIR__ . '/../src/routes.php')($app);
+$displayErrors = filter_var(
+    getenv('APP_DEBUG') !== false ? getenv('APP_DEBUG') : '0',
+    FILTER_VALIDATE_BOOL,
+);
 
-$app->run();
+Bootstrap::boot($env, $displayErrors)->run();
