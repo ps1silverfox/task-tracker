@@ -424,7 +424,7 @@ deps: INT-01
 !v test -f deploy/httpd-task-tracker.conf && grep -q 'Listen 127.0.0.1:8080' deploy/httpd-task-tracker.conf && echo OK
 !c deploy: Apache 2.4 vhost config + deploy steps for Win Server 2016
 
-### [ ] INT-05 deploy/smoke.ps1 (curl health + admin + public + 405)
+### [x] INT-05 deploy/smoke.ps1 (curl health + admin + public + 405)
 +f deploy/smoke.ps1
 deps: INT-04
 !v test -f deploy/smoke.ps1 && powershell -Command "Get-Content deploy/smoke.ps1 | Select-String 'health' | Measure-Object | Select -ExpandProperty Count" | grep -q '[1-9]'
