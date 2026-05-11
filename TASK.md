@@ -170,14 +170,14 @@ deps: LIB-05, MODEL-01
 
 ## Phase 3 — Aggregations
 
-### [ ] AGG-01 SubProjectRollup (recursive tree traversal)
+### [x] AGG-01 SubProjectRollup (recursive tree traversal)
 +f lib/src/Aggregations/SubProjectRollup.php
 +f lib/tests/Aggregations/SubProjectRollupTest.php
 deps: REPO-01
 !v cd lib && ./vendor/bin/phpunit tests/Aggregations/SubProjectRollupTest.php
 !c feat(lib): SubProjectRollup — recursive child totals (count, effort)
 
-### [ ] AGG-02 ExecutiveSummary (time-series bucketing)
+### [x] AGG-02 ExecutiveSummary (time-series bucketing)
 +f lib/src/Aggregations/ExecutiveSummary.php
 +f lib/tests/Aggregations/ExecutiveSummaryTest.php
 deps: REPO-07
