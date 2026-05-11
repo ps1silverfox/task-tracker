@@ -5,6 +5,7 @@ declare(strict_types=1);
 use Slim\App;
 use TaskTracker\Admin\Controllers\RosterController;
 use TaskTracker\Admin\Controllers\TasksController;
+use TaskTracker\Admin\Controllers\TeamsController;
 
 return static function (App $app): void {
     $app->get('/',              [TasksController::class, 'list']);
@@ -28,4 +29,9 @@ return static function (App $app): void {
     $app->post('/roster',             [RosterController::class, 'create']);
     $app->post('/roster/{id}',        [RosterController::class, 'update']);
     $app->delete('/roster/{id}',      [RosterController::class, 'deactivate']);
+
+    // ADMIN-06 teams routes. No DELETE: closed event enum has no team.deleted.
+    $app->get('/teams',               [TeamsController::class, 'list']);
+    $app->post('/teams',              [TeamsController::class, 'create']);
+    $app->post('/teams/{id}',         [TeamsController::class, 'update']);
 };

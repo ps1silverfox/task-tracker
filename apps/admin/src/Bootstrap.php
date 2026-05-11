@@ -12,6 +12,7 @@ use Slim\App;
 use Slim\Factory\AppFactory;
 use TaskTracker\Admin\Controllers\RosterController;
 use TaskTracker\Admin\Controllers\TasksController;
+use TaskTracker\Admin\Controllers\TeamsController;
 use TaskTracker\Aggregations\DependencyGraph;
 use TaskTracker\Aggregations\ExecutiveSummary;
 use TaskTracker\Aggregations\SubProjectRollup;
@@ -137,6 +138,9 @@ final class Bootstrap
             ),
             RosterController::class => static fn(ContainerInterface $c): RosterController => new RosterController(
                 $c->get(RosterRepository::class),
+            ),
+            TeamsController::class => static fn(ContainerInterface $c): TeamsController => new TeamsController(
+                $c->get(TeamRepository::class),
             ),
         ];
     }
