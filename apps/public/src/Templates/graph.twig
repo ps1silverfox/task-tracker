@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Dependency Graph &middot; Task Tracker</title>
+    <meta name="generator" content="task-tracker-public">
+    <style>
+        #graph-canvas { width: 100%; height: 720px; border: 1px solid #ddd; }
+        .banner-warn { background: #fff3cd; border: 1px solid #ffe69c; padding: 0.5em 0.75em; margin: 0.5em 0; }
+    </style>
+</head>
+<body>
+<header>
+    <h1>Dependency Graph</h1>
+    <p class="meta">
+        Arrow direction: prereq &rarr; blocked task.
+        Node fill = status, border = priority. Click a node to open its detail page.
+    </p>
+</header>
+
+<form method="get" action="/graph" class="filters" id="graph-filters">
+    <fieldset>
+        <legend>Status</legend>
+        {% for s in statuses_live %}
+            <label>
+                <input type="checkbox" name="status_pick" value="{{ s }}"
+                       {% if s in status_filter %}checked{% endif %}>
+                {{ s }}
+            </label>
+        {% endfor %}
+        <input type="hidden" name="status" id="status-input"
+               value="{{ status_filter|join(',') }}">
+    </fieldset>
+    <label>Team <input type="text" name="team_id" value="{{ team_id }}" placeholder="team id"></label>
+    <label>Root <input type="text" name="root"    value="{{ root }}"    placeholder="task id (subtree)"></label>
+    <button type="submit">Apply</button>
+</form>
+
+<div id="graph-banner" hidden class="banner-warn"
+     data-node-ceiling="{{ node_ceiling }}">
+    Graph exceeds {{ node_ceiling }} nodes &mdash; consider tightening filters
+    (status, team, or root subtree).
+</div>
+
+<div id="graph-canvas"
+     data-json-url="{{ json_url }}"></div>
+
+<script src="/vendor/cytoscape/cytoscape.min.js"></script>
+<script src="/vendor/cytoscape/cytoscape-dagre.min.js"></script>
+<script>
+(function () {
+    // Collapse the status checkbox group into the single hidden field the
+    // controller expects (comma-separated). The form has no client-side
+    // framework — this is the minimum glue to keep the submitted shape stable.
+    var form = document.getElementById('graph-filters');
+    if (form) {
+        form.addEventListener('submit', function () {
+            var picks = Array.prototype.map.call(
+                form.querySelectorAll('input[name="status_pick"]:checked'),
+                function (el) { return el.value; }
+            );
+            document.getElementById('status-input').value = picks.join(',');
+            Array.prototype.forEach.call(
+                form.querySelectorAll('input[name="status_pick"]'),
+                function (el) { el.disabled = true; }
+            );
+        });
+    }
+
+    var container = document.getElementById('graph-canvas');
+    if (!container || typeof cytoscape === 'undefined') { return; }
+    var jsonUrl = container.getAttribute('data-json-url') || '/graph.json';
+    var banner = document.getElementById('graph-banner');
+
+    var statusFill = {
+        open: '#9ca3af', in_progress: '#3b82f6',
+        blocked: '#ef4444', done: '#10b981'
+    };
+    var priorityBorder = {
+        low: '#9ca3af', med: '#000000',
+        high: '#f59e0b', critical: '#ef4444'
+    };
+
+    fetch(jsonUrl, { headers: { 'Accept': 'application/json' } })
+        .then(function (r) { return r.json(); })
+        .then(function (data) {
+            if (banner && data.meta && data.meta.exceeds_threshold) {
+                banner.hidden = false;
+            }
+            var elements = (data.nodes || []).concat(data.edges || []);
+            var cy = cytoscape({
+                container: container,
+                elements: elements,
+                style: [
+                    {
+                        selector: 'node',
+                        style: {
+                            'label': 'data(label)',
+                            'background-color': function (ele) {
+                                return statusFill[ele.data('status')] || '#9ca3af';
+                            },
+                            'border-color': function (ele) {
+                                return priorityBorder[ele.data('priority')] || '#000';
+                            },
+                            'border-width': 2,
+                            'text-valign': 'center',
+                            'text-halign': 'center',
+                            'color': '#111',
+                            'font-size': 10
+                        }
+                    },
+                    {
+                        selector: 'edge',
+                        style: {
+                            'curve-style': 'bezier',
+                            'target-arrow-shape': 'triangle',
+                            'arrow-scale': 1.2,
+                            'line-color': '#888',
+                            'target-arrow-color': '#888',
+                            'width': 1.5
+                        }
+                    }
+                ],
+                layout: { name: typeof window.cytoscapeDagre !== 'undefined' ? 'dagre' : 'breadthfirst' }
+            });
+            cy.on('tap', 'node', function (evt) {
+                var id = evt.target.id();
+                if (id) { window.location.href = '/tasks/' + encodeURIComponent(id); }
+            });
+        });
+})();
+</script>
+</body>
+</html>
