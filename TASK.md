@@ -348,7 +348,7 @@ deps: PUB-01, AGG-02
 !v cd apps/public && ./vendor/bin/phpunit tests/Controllers/ExecutiveSummaryControllerTest.php
 !c feat(public): ExecutiveSummaryController — time-series HTML + Chart.js
 
-### [ ] PUB-05 CSV exports (tasks.csv + summary.csv)
+### [x] PUB-05 CSV exports (tasks.csv + summary.csv)
 +f apps/public/src/Controllers/ExportController.php
 +f apps/public/tests/Controllers/ExportControllerTest.php
 +m apps/public/src/routes.php
@@ -356,7 +356,7 @@ deps: PUB-02, PUB-04, LIB-03
 !v cd apps/public && ./vendor/bin/phpunit tests/Controllers/ExportControllerTest.php
 !c feat(public): CSV exports with injection-guard
 
-### [ ] PUB-06 GraphController + cytoscape.js page
+### [x] PUB-06 GraphController + cytoscape.js page
 +f apps/public/src/Controllers/GraphController.php
 +f apps/public/public/vendor/cytoscape/cytoscape.min.js
 +f apps/public/public/vendor/cytoscape/cytoscape-dagre.min.js
@@ -367,7 +367,7 @@ deps: PUB-01, AGG-03
 !v cd apps/public && ./vendor/bin/phpunit tests/Controllers/GraphControllerTest.php
 !c feat(public): GraphController — cytoscape.js dependency visualizer + JSON endpoint
 
-### [ ] PUB-07 Saved views application
+### [x] PUB-07 Saved views application
 +f apps/public/src/Controllers/SavedViewsController.php
 +f apps/public/tests/Controllers/SavedViewsControllerTest.php
 +m apps/public/src/routes.php
@@ -375,7 +375,7 @@ deps: PUB-02, REPO-06
 !v cd apps/public && ./vendor/bin/phpunit tests/Controllers/SavedViewsControllerTest.php
 !c feat(public): GET /views/{id} — apply saved view to backlog
 
-### [ ] PUB-08 Health endpoint + templates + Bootstrap
+### [x] PUB-08 Health endpoint + templates + Bootstrap
 +f apps/public/src/Controllers/HealthController.php
 +f apps/public/src/Templates/layout.twig
 +f apps/public/src/Templates/backlog.twig
@@ -387,7 +387,7 @@ deps: PUB-02, PUB-03
 !v cd apps/public && ./vendor/bin/phpunit tests/Controllers/HealthControllerTest.php
 !c feat(public): templates + health endpoint + Bootstrap CSS
 
-### [ ] PUB-09 Public-immutability invariant test (405 on non-GET)
+### [x] PUB-09 Public-immutability invariant test (405 on non-GET)
 +f apps/public/tests/Invariants/ReadOnlyTest.php
 deps: PUB-02, PUB-03, PUB-04, PUB-05, PUB-06, PUB-07
 !v cd apps/public && ./vendor/bin/phpunit tests/Invariants/ReadOnlyTest.php
