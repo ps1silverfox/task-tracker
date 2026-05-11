@@ -8,13 +8,13 @@
 
 ## Phase 0 — Workspace scaffold
 
-### [ ] INIT-01 Workspace composer.json + license policy
+### [x] INIT-01 Workspace composer.json + license policy
 +f composer.json
 +f docs/license-policy.md
 !v php -r "json_decode(file_get_contents('composer.json'), false, 512, JSON_THROW_ON_ERROR); echo 'OK';"
 !c chore: workspace composer.json + license policy doc
 
-### [ ] INIT-02 lib/ package skeleton (task-tracker/core)
+### [x] INIT-02 lib/ package skeleton (task-tracker/core)
 +f lib/composer.json
 +f lib/src/.gitkeep
 +f lib/phpunit.xml
@@ -23,7 +23,7 @@ deps: INIT-01
 !v cd lib && composer install --no-interaction && ./vendor/bin/phpunit tests/Sanity
 !c chore(lib): scaffold task-tracker/core composer package
 
-### [ ] INIT-03 apps/admin/ Slim skeleton
+### [x] INIT-03 apps/admin/ Slim skeleton
 +f apps/admin/composer.json
 +f apps/admin/public/index.php
 +f apps/admin/src/routes.php
@@ -34,7 +34,7 @@ deps: INIT-02
 !v cd apps/admin && composer install --no-interaction && ./vendor/bin/phpunit tests/Sanity
 !c chore(admin): scaffold Slim 4 admin app
 
-### [ ] INIT-04 apps/public/ Slim skeleton (read-only)
+### [x] INIT-04 apps/public/ Slim skeleton (read-only)
 +f apps/public/composer.json
 +f apps/public/public/index.php
 +f apps/public/src/routes.php

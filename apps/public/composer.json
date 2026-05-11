@@ -1,0 +1,41 @@
+{
+    "name": "task-tracker/public",
+    "description": "Task Tracker v1.0 — public Slim 4 app (binds *:80, READ-ONLY against shared data/). Zero write controllers permitted.",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "slim/psr7": "^1.6",
+        "slim/slim": "^4.14",
+        "task-tracker/core": "*@dev"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^11.5"
+    },
+    "autoload": {
+        "psr-4": {
+            "TaskTracker\\Public\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "TaskTracker\\Public\\Tests\\": "tests/"
+        }
+    },
+    "repositories": [
+        {
+            "type": "path",
+            "url": "../../lib",
+            "options": {
+                "symlink": false
+            }
+        }
+    ],
+    "config": {
+        "sort-packages": true,
+        "preferred-install": "dist",
+        "optimize-autoloader": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
