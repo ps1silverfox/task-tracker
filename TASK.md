@@ -250,7 +250,7 @@ deps: ADMIN-02
 !v cd apps/admin && ./vendor/bin/phpunit tests/Controllers/TasksControllerUpdateTest.php
 !c feat(admin): TasksController — POST /tasks/{id} update, DELETE soft-delete
 
-### [ ] ADMIN-04 TasksController — assign + status + dependencies + tags
+### [x] ADMIN-04 TasksController — assign + status + dependencies + tags
 +m apps/admin/src/Controllers/TasksController.php
 +f apps/admin/tests/Controllers/TasksControllerActionsTest.php
 deps: ADMIN-03, REPO-04, REPO-05

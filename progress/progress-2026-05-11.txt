@@ -1,0 +1,167 @@
+## 1|LIB-01|PASS
++lib/src/Util/Uuid7.php,lib/tests/Util/Uuid7Test.php
+verify: exit 0
+commit: 3320e56
+learn: ramsey/uuid 4.7 already provides Uuid::uuid7() natively — a 3-line wrapper is sufficient and avoids re-implementing the 48-bit-ms + version + variant bit layout. v7 test must sleep > 1 ms between samples to guarantee the embedded ms timestamp advances; same-ms ordering relies on internal monotonic counters and shouldn't be tested.
+---
+
+## 2|LIB-02|PASS
++lib/src/Util/IsoTime.php,lib/tests/Util/IsoTimeTest.php
+verify: exit 0
+commit: 79189f3
+learn: Use millisecond precision (`Y-m-d\TH:i:s.v\Z`) so IsoTime timestamps match the embedded-ms ordering of Uuid7 — keeps NDJSON audit-event order unambiguous when two events share a wall-clock second. Always pass an explicit `DateTimeZone('UTC')` to DateTimeImmutable — `'now'` defaults to system TZ, which silently drifts the audit log if Apache's php.ini date.timezone differs from prod. Emit `Z` (1 byte, unambiguous); accept both `Z` and offset forms on parse via RFC3339_EXTENDED → RFC3339 → generic constructor fallback chain.
+---
+
+## 3|LIB-03|PASS
++lib/src/Util/CsvInjectionGuard.php,lib/tests/Util/CsvInjectionGuardTest.php
+verify: exit 0
+commit: 09b6ac5
+learn: OWASP CSV-injection sentinel set is exactly 6 chars (=, +, -, @, \t, \r) — \t and \r are non-obvious but Excel strips leading whitespace before formula evaluation, so they're attack carriers too. Apostrophe prefix is naturally idempotent because ' is not in the sentinel set; pin that invariant with a dedicated test so a future regex-based rewrite can't silently regress. Used PHPUnit 11's `#[DataProvider]` attribute (not the legacy `@dataProvider` docblock) to keep the test file compatible with the project's phpunit ^11.5 requirement. PHP is not on default Git Bash PATH on this Windows host — `/c/php` must be prepended (`export PATH="/c/php:$PATH"`) before running `./vendor/bin/phpunit`.
+---
+
+## 4|LIB-04|PASS
++lib/src/Storage/CsvStore.php,lib/tests/Storage/CsvStoreTest.php,TASK.md,AGENTS.md
+verify: exit 0
+commit: bd5ca9c
+learn: The spec's `flock($fh, LOCK_EX)` on the data file + `rename($tmp, $csvPath)` pattern is a POSIX-ism that breaks on Windows NTFS — `rename()` over an open handle returns Access Denied (code 5). Fix: lock a sidecar `<path>.lock` instead, keep the data file closed across the rename. Same lockfile is used by `readAll` (LOCK_SH) so readers serialise correctly against in-flight writes without ever opening the destination. Secondary gotcha: `fgetcsv` treats a non-quote first byte as the start of an unquoted field, so a leading UTF-8 BOM contaminates header[0] as the literal `[BOM]"ID"` — strip the BOM from the byte stream BEFORE the first `fgetcsv()` call, not from the parsed cell. Both patterns recorded in AGENTS.md (windows-rename-needs-sidecar-lock, fgetcsv-bom-and-rfc4180) for future iterations doing storage work.
+---
+
+## 5|LIB-05|PASS
++lib/src/Storage/EventLog.php,lib/tests/Storage/EventLogTest.php,TASK.md
+verify: exit 0
+commit: 5d49bed
+learn: Spec §8 says "rotation by date (new file at UTC midnight on first write of the new day)" — implementing rotation by *wall-clock* makes the cross-day-rotation test require time mocking. Deriving the filename's date from `$event['ts']` instead is equivalent in production (ts defaults to IsoTime::now()) but trivially testable AND correct for backfill/replay scenarios that future tools (rotate-logs.php, reconcile.php) may need. Closed action enum exposed as `EventLog::ACTIONS` public const so the INT-02 audit-completeness invariant test can introspect the set instead of duplicating the 22-string list. `file_put_contents(..., FILE_APPEND | LOCK_EX)` is the spec's literal append primitive — don't switch to fopen+fwrite+fflush+fclose just because the spec text also mentions fflush; the latter is unreachable when file_put_contents owns the handle, and the lock+append is already atomic on NTFS for sub-4KB writes.
+---
+
+## 6|MODEL-01|PASS
++lib/src/Models/Enums.php,lib/src/Models/Task.php,lib/src/Models/RosterMember.php,lib/src/Models/Team.php,lib/src/Models/Event.php,lib/src/Models/SavedView.php,lib/tests/Models/TaskTest.php,lib/tests/Models/EnumsTest.php
+verify: exit 0
+commit: ac4be5d
+learn: TASK.md's `+f lib/src/Models/Enums.php` (single file for both STATUS and PRIORITY) collides with PSR-4's one-class-per-file rule if PHP `enum` declarations are used — autoloader would look for `Status.php`/`Priority.php` and miss them. Resolved by making `Enums` a `final class` of `public const` arrays plus `requireStatus()`/`requirePriority()` static validators; stays PSR-4 clean, no extra files, no composer.json edit needed. Spec §5 lists `deleted` as a STATUS value (not a separate column), so soft-delete is encoded *in* the status column — expose `STATUSES` (5, all-incl-deleted) and `STATUSES_LIVE` (4) on Enums so read paths can intentionally filter. Round-trip discipline for CSV models: every nullable column maps `""` ↔ `null` and `fromCsvRow`/`toCsvRow` must be exact inverses (asserted via `assertSame($row, $task->toCsvRow())`). EFFORT_HOURS round-trips through `number_format(..., 2, '.', '')` so `'4'` → `4.0` → `'4.00'` is the (intentional) canonical form. PHPUnit 11 deprecates `@dataProvider` doc-tags in favor of `#[DataProvider]` attributes; codebase already uses attributes in CsvInjectionGuardTest — match the convention to keep phpunit.xml's `failOnWarning="true"` clean.
+---
+
+## 7|REPO-01|PASS
++lib/src/Repositories/TaskRepository.php,lib/tests/Repositories/TaskRepositoryTest.php,TASK.md
+verify: exit 0
+commit: 92273ad
+learn: The two-write audit invariant (CSV first, NDJSON second, no rollback on NDJSON failure) forces an ordering decision: the repository emits events *after* `CsvStore::txn()` returns, not from inside the mutator closure. Reason: txn's mutator may run zero events on a no-op return, may throw to abort, and most importantly the on-disk state is only authoritative once txn() unwinds the lock. To carry the before/after Task pair out of the mutator for event construction, capture into `&$captured` by reference — PHP closures see the outer variable directly with the `&` modifier, which is the cleanest fit for txn's "return rows" callback shape (vs. monkey-patching txn to accept an events list). NDJSON failure is forwarded to `error_log()` with a structured "task-tracker:" prefix so tools/reconcile.php can grep server logs to find drift. Spec §7's "every event includes assignee_id_snapshot and team_id_snapshot" reads as a denormalization requirement that survives later reassignment — keep the keys present in the envelope even when null; the downstream Event model normalizes empty/missing to null on read. `task.updated` always fires alongside specialized events (task.assigned/task.completed/etc.) carrying `data.fields=[...changed cols...]` per spec §8 action enum — gives the audit feed one always-present "anything changed" row plus structured from→to detail. Subtle invariant in `update()`: FIRST_ASSIGNED_AT is set only on null→non-null transition AND only when the column is still empty; reassignment (uuid→uuid) leaves it alone forever, preserving the spec's "set once" guarantee. STATUS→done sets COMPLETED_AT, STATUS leaving done clears it — symmetric toggle keeps `done`-state and completion-timestamp from drifting.
+---
+
+## 8|REPO-02|PASS
++lib/src/Repositories/RosterRepository.php,lib/tests/Repositories/RosterRepositoryTest.php,TASK.md
+verify: exit 0
+commit: 1561e68
+learn: Closed action enum forces API surface — no `roster.reactivated` in EventLog::ACTIONS, therefore RosterRepository must not expose reactivation. update() is intentionally restricted to name/email/teamId; ACTIVE flag flips only via deactivate(). The `update ignores active field silently` test pins this contract. Envelope shape is roster_id + team_id_snapshot (parallel to task_id + assignee/team snapshots in TaskRepo); roster.updated event carries before/after slice for changed fields so the activity feed can render diffs without re-reading CSV state.
+---
+
+## 9|REPO-03|PASS
++lib/src/Repositories/TeamRepository.php,lib/tests/Repositories/TeamRepositoryTest.php,TASK.md
+verify: exit 0
+commit: 7d51715
+learn: Team has the simplest contract in the codebase — closed action enum admits only `team.created`/`team.updated` (spec §8), no deletion path. The repo therefore exposes only create()+update(); soft-delete is intentionally absent because referential history (team_id_snapshot in past events) must remain resolvable. Envelope key is `team_id` (entity-self), not `team_id_snapshot` (which is for foreign references in Roster/Task events). Also confirmed: CsvStore writes cells verbatim — the CsvInjectionGuard is NOT applied at the storage layer; it belongs at export boundaries (PUB-05). Don't write tests that assert apostrophe-prefixing of cells through the repo.
+---
+
+## 10|REPO-04|PASS
++lib/src/Repositories/DependencyRepository.php,lib/tests/Repositories/DependencyRepositoryTest.php,TASK.md
+verify: exit 0
+commit: c0b44f9
+learn: Cycle prevention must run *inside* the CsvStore::txn closure, not before it — otherwise a concurrent add between the read-for-DFS and the write-of-edge could close a cycle that our pre-read couldn't see (TOCTOU). The exclusive flock on `<csv>.lock` already serialises writers; piggybacking the DFS on the same critical section costs nothing and removes the race window entirely. Edge semantics from spec §5: row `(TASK_ID=A, PREREQ_ID=B)` means "B is a prerequisite of A" / "B blocks A"; the adjacency map for cycle detection is therefore `requires[task] = list<prereq>`. DFS from the *new prereq_id* (asking "can this prereq reach the task?") is correct — opposite direction is a common bug. Self-edge (A→A) is the degenerate cycle; algorithmically the DFS catches it at depth 0, but an early `if ($taskId === $prereqId) throw 'would create cycle'` skips the empty-file CsvStore round-trip — verified by the `no CSV file written` assertion. No `Dependency` model was scaffolded by MODEL-01 (rows are just a pair of UUIDs), so the repo defines its own `public const HEADERS` and returns plain associative arrays — keep that pattern for any future join-table repositories (TagRepository in REPO-05). Closed action enum admits only `dependency.added` / `dependency.removed` — there is no update event because edges are immutable; modifying an edge is `remove + add`. remove() is idempotent (no event when absent) to support clean replays from the activity feed; add() rejects duplicate composite keys with a distinct "duplicate dependency" message so callers can distinguish "already there" from "would close a cycle".
+---
+
+## 12|REPO-05|PASS
++lib/src/Repositories/TagRepository.php,lib/tests/Repositories/TagRepositoryTest.php,TASK.md
+verify: exit 0
+commit: 4f2cb96
+learn: Tag normalization belongs in the repository, not in callers. Spec §7 says TAG is "lowercase, slugified" — exposing `TagRepository::normalize(string): string` (public static) gives every caller (admin POST handler, future SavedView filter, importer) one canonical truth. The function intentionally returns '' for unnormalizable input (whitespace, '!!!', '---') rather than throwing. Read methods (`has`, `tasksWith`) treat '' as "definite no-match" and short-circuit; write methods (`add`, `remove`) promote '' to InvalidArgumentException. This split keeps query paths exception-free while keeping the storage invariant (no empty TAG ever lands on disk). No Tag model class — the row is a pure `(TASK_ID, TAG)` tuple with no behavior; mirror the DependencyRepository pattern of `public const HEADERS` + assoc-array reads. Duplicate-add semantics matched DependencyRepository (throw `'duplicate tag'`) for consistency even though tags are conceptually a set; the controller can map that to 422. The duplicate check runs *inside* the CsvStore::txn closure so it's serialised under the same flock as the row append — no TOCTOU window where two concurrent admin workers could both pass a pre-check and both append the same (TASK_ID, TAG) pair. `add()` returns the normalized slug string (not void like DependencyRepository::add) so the controller can echo it back in the 201/204 response without re-normalizing.
+---
+
+## 13|REPO-06|PASS
++lib/src/Repositories/SavedViewRepository.php,lib/tests/Repositories/SavedViewRepositoryTest.php
+verify: exit 0
+commit: 2477421
+learn: spec §8 admits saved_view.created/saved_view.deleted only — no update event. Repo therefore exposes create/delete (rename = delete+recreate). NAME uniqueness check sits inside CsvStore::txn() closure under flock so concurrent creates can't both win. Filter JSON survives RFC4180 quoting because CsvStore wraps the whole field — embedded commas/quotes/CSV-injection-prefix chars in the JSON round-trip cleanly.
+---
+
+## 14|REPO-07|PASS
++lib/src/Repositories/EventRepository.php,lib/tests/Repositories/EventRepositoryTest.php
+verify: exit 0
+commit: cc8331b
+learn: Generator-based NDJSON reader keeps memory flat for unbounded date ranges; using rtrim($line, "\r\n") tolerates accidental CRLF if a file is written from a non-EventLog source. iterator_to_array() needs preserve_keys=false when consuming yield-from chains, else numeric keys collide and silently drop events.
+---
+
+## 15|AGG-01|PASS
++lib/src/Aggregations/SubProjectRollup.php,lib/tests/Aggregations/SubProjectRollupTest.php
+verify: exit 0
+commit: 2f647e9
+learn: TaskRepository::update() doesn't validate PARENT_ID — repo only enforces SLUG uniqueness and STATUS/PRIORITY enums. Any cycle-defending aggregation must carry its own visited-set guard because manual CSV edits or sequenced updates (A.parent=B, B.parent=A) trivially create cycles the storage layer accepts. Pre-indexing parent→children + id→task once per call keeps the whole rollup at O(N) for a sub-tree of any depth; re-scanning the listAll() inside walk() would have been O(N·depth). Spec §13 invariant "rollup = sum of recursive leaf counts/effort" reads as a property assertion for INT-01-class integration tests, not a constraint on the algorithm: aggregate over the whole subtree (root + all descendants), and the leaf-sum identity falls out for any tree whose internal nodes have zero own-effort.
+---
+
+## 16|AGG-02|PASS
++lib/src/Aggregations/ExecutiveSummary.php,lib/tests/Aggregations/ExecutiveSummaryTest.php,TASK.md
+verify: exit 0
+commit: 91cab30
+learn: Pre-generate buckets from snapped from-date, then count into the map keyed by bucket label — keeps zero-count periods present (essential for Chart.js continuous axis) and decouples bucket boundary math from the streaming filter loop. PERIOD_QUARTER label `YYYY-Q{n}` sorts correctly alphabetically alongside `YYYY-MM` and `YYYY-MM-DD` peers.
+---
+
+## 17|AGG-03|PASS
++lib/src/Aggregations/DependencyGraph.php,lib/tests/Aggregations/DependencyGraphTest.php
+verify: exit 0
+commit: a08e885
+learn: dependency-graph is a pure read-only projection (TaskRepository + DependencyRepository → cytoscape JSON); no two-write audit needed. Filter chain composes order-independently because the final pass intersects allowed-set vs. edge endpoints — dropping any half-outside edge automatically. Edge direction follows spec §10: PREREQ_ID -> TASK_ID (prereq blocks dependent).
+---
+
+## 18|TOOL-01|PASS
++tools/seed.php,tests/integration/SeedTest.php,TASK.md
+verify: exit 0
+commit: 31f0041
+learn: seed.php embeds the canonical (filename, header-row) schema inline because the model classes already own header constants — DRY across tools by reading Task::HEADERS / DependencyRepository::HEADERS rather than re-declaring. TOOL-02 and TOOL-03 should lift this 6-tuple list into a shared tools/_schema.php helper rather than duplicate it three times. Note: iteration 17 committed AGG-03 code (a08e885) but forgot to flip [ ]→[x] in TASK.md; that unstaged edit was stashed during this iteration and restored afterward so a future iteration can sweep it in (or it'll ride along whenever TASK.md next gets touched legitimately).
+---
+
+## 19|TOOL-02|PASS
++tools/migrate.php,tests/integration/MigrateTest.php
+verify: exit 0
+commit: ee66f9a
+learn: Migration runner only needs a registry of from→to callables (empty at v1.0) plus refuse-downgrade + atomic tmp+rename — same pattern as CsvStore but on a single integer file. Refusing to downgrade is the critical invariant: a future v1.5 build writes "2"; if an older v1.2 build is redeployed and silently rewrites it to "1", v1.2 will read v1.5-shaped data and corrupt it. Atomic rename means partial writes can't leave _schema_version.txt half-written if the host crashes mid-migrate. PHPUnit's failOnWarning="true" turns `@unlink` into the correct best-effort-cleanup primitive — bare unlink would fail the test on phantom warnings during tmp debris removal.
+---
+
+## 20|TOOL-03|PASS
++tools/reconcile.php,tests/integration/ReconcileTest.php,TASK.md
+verify: exit 0
+commit: 8344bba
+learn: drift compare on ISO 8601 UTC strings is safe with strcmp because IsoTime::TS_FORMAT is fixed-width zero-padded — no DateTime parse needed.
+---
+
+## 21|TOOL-04|PASS
++tools/rotate-logs.php,tests/integration/RotateLogsTest.php,TASK.md
+verify: exit 0
+commit: 2970ff1
+learn: PHP DateTimeImmutable::createFromFormat('!Y-m-d', ...) is permissive with calendar overflow (2026-13-40 silently rolls to 2027-02-09) — a strict input validator must additionally assert $dt->format('Y-m-d') === $input to reject overflow. Filename-date rotation (parse YYYY-MM-DD from `changes-*.ndjson`) is preferable to mtime because mtime can drift via backup/touch, while the filename is the authoritative rotation key set at append time by EventLog. Stream-gzip + close-handles-before-rename + unlink-source-after-rename gives clean crash safety: pre-rename crash leaves source intact; post-rename/pre-unlink crash leaves both files (next sweep refuses to overwrite the gz and skips, surfacing the duplicate for ops review).
+---
+
+## 23|ADMIN-01|PASS
++apps/admin/src/Bootstrap.php,apps/admin/tests/BootstrapTest.php,apps/admin/public/index.php
+verify: exit 0
+commit: 3221bea
+learn: Slim 4's CallableResolver binds $this→container on every route callable; `static fn` / `static function` route handlers trigger a PHP warning AND a TypeError because Closure::bind() returns null for static closures. Never use `static` on Slim route handlers. With phpunit `failOnWarning="true"`, the warning surfaces immediately at the bootstrap layer instead of leaking into ADMIN-02 controllers. Also: lib/ is consumed via a Composer path repo with `symlink:false`, so apps/admin/vendor/task-tracker/core is a snapshot — re-run `composer update task-tracker/core` after any lib/ change before running admin tests.
+---
+
+## 24|ADMIN-02|PASS
++apps/admin/src/Controllers/TasksController.php,apps/admin/tests/Controllers/TasksControllerCreateTest.php,apps/admin/src/routes.php,apps/admin/src/Bootstrap.php,TASK.md,AGENTS.md
+verify: exit 0
+commit: f65c75e
+learn: TASK.md's `+m` list undercounts: `+f Controllers/TasksController.php` required an unlisted `+m Bootstrap.php` because the custom PSR-11 container has no auto-wiring — Slim 4's CallableResolver hands `[Class::class, 'method']` straight to `$container->get($id)`, and without a factory it falls back to `new Class()` and TypeErrors. Also added `addBodyParsingMiddleware()` (BodyParsing → Routing → Error, innermost-first) so production form-urlencoded/JSON POSTs hydrate `$request->getParsedBody()`; tests using `withParsedBody()` would pass without it but real Apache requests wouldn't. The 422 error-class split (invalid_field vs conflict) maps cleanly to InvalidArgumentException vs RuntimeException emitted by TaskRepository::create — no shared sentinel string, just two catch blocks. Pattern recorded as AGENTS.md `controllers-require-bootstrap-registration` for ADMIN-03..ADMIN-08 + PUB-02..PUB-08.
+---
+
+## 25|ADMIN-03|PASS
++apps/admin/src/Controllers/TasksController.php,apps/admin/src/routes.php,apps/admin/tests/Controllers/TasksControllerUpdateTest.php,TASK.md
+verify: exit 0
+commit: 5f5ae57
+learn: TaskRepository::update() treats every key in its $changes array as an explicit set (including null/empty), so the HTTP controller needs a SPARSE input normalizer using array_key_exists() — the ?? null pattern reused from create() would silently null-out every field omitted from a partial form POST. Second gotcha: the repo throws RuntimeException for both "task not found" (race after pre-check) and "slug not unique" with no distinct exception class; the controller has to str_contains('not found') to distinguish 404 vs 422 — same duck-typing pattern ADMIN-02 used for create/conflict. Slim 4 routes /tasks and /tasks/{id} as distinct patterns, so registering POST /tasks (create) alongside POST /tasks/{id} (update) is unambiguous despite the shared prefix.
+---
+
+## 26|ADMIN-04|PASS
++apps/admin/src/Bootstrap.php,apps/admin/src/Controllers/TasksController.php,apps/admin/src/routes.php,apps/admin/tests/Controllers/TasksControllerActionsTest.php,TASK.md
+verify: exit 0
+commit: e24ca14
+learn: Action routes intentionally live BELOW the catch-all /tasks/{id} pair in routes.php — Slim 4's FastRoute dispatcher matches by segment count, so /tasks/{id}/assign (3 segments) and /tasks/{id} (2 segments) never collide regardless of registration order. Reused TaskRepository::update() for /assign and /status rather than adding bespoke repo methods so FIRST_ASSIGNED_AT / COMPLETED_AT semantics and the task.assigned/status_changed event emission stayed in one place. /status is validated against STATUSES_LIVE (not STATUSES) so `deleted` cannot be reached via the status endpoint — soft-delete remains the sole responsibility of DELETE /tasks/{id}. Dependency add and remove both return 303 even when idempotent-no-op so the PRG redirect contract is uniform; the cycle/duplicate cases return 422 conflict and leave the CSV untouched (verified inside the txn closure under exclusive flock — no TOCTOU window).
+---
