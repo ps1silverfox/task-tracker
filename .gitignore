@@ -1,6 +1,6 @@
-/vendor/
-/apps/*/vendor/
-/lib/vendor/
+
+
+
 /node_modules/
 /composer.lock
 /data/*.csv
