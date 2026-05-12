@@ -1,0 +1,42 @@
+## 1|INIT-01|PASS
++composer.json,docs/license-policy.md
+verify: exit 0
+commit: 2d5ef1a
+learn: PHP 8.3.29 lives at /c/php (NOT in PATH). Future iterations must prepend /c/php to PATH before any !v command that calls php or composer. Document this in AGENTS.md.
+---
+
+## 2|INIT-02|PASS
++lib/composer.json,lib/phpunit.xml,lib/src/.gitkeep,lib/tests/Sanity/PackageTest.php
+verify: exit 0
+commit: a84f251
+learn: Root .gitignore is anchored (`/composer.lock`, `/.phpunit.cache/`) so `git add lib/` accidentally stages lib/composer.lock and lib/.phpunit.cache/test-results. Unstage explicitly until INIT-06 broadens patterns. Also: composer is a phar at /c/php/composer — invoke as `/c/php/php.exe /c/php/composer ...`.
+---
+
+## 3|INIT-03|PASS
++apps/admin/composer.json,apps/admin/public/index.php,apps/admin/src/routes.php,apps/admin/src/Templates/.gitkeep,apps/admin/phpunit.xml,apps/admin/tests/Sanity/BootTest.php
+verify: exit 0
+commit: be20f94
+learn: Path-repo deps (task-tracker/core in apps/*/composer.json) resolve only to dev-main since lib/ is unversioned. Use per-constraint stability flag `"task-tracker/core": "*@dev"` rather than weakening global `minimum-stability` to dev — keeps Slim/PHPUnit on stable releases while allowing the in-tree path package. Same fix will be needed in apps/public/composer.json (INIT-04).
+---
+
+## 4|INIT-04|PASS
++apps/public/composer.json,apps/public/public/index.php,apps/public/src/routes.php,apps/public/src/Templates/.gitkeep,apps/public/phpunit.xml,apps/public/tests/Sanity/BootTest.php,TASK.md
+verify: exit 0
+commit: 9ed93f1
+learn: `Public` IS legal as a PHP 8.3 namespace segment despite `public` being reserved as a visibility/class keyword — verified with `php -r 'namespace App\Public; ...'`. Used `TaskTracker\Public\` for parity with `TaskTracker\Admin\`. Also pre-seeded a Sanity tripwire test (`testNoWriteControllerNamespaceExists`) that scans src/Controllers/*.php for `$app->(post|put|patch|delete|map)` — fires earlier than PUB-09's full 405 invariant and catches the violation at the namespace-import level. Skipped staging apps/public/composer.lock to match admin's tracked-file set.
+---
+
+## 5|INIT-05|PASS
++.env.example,lib/composer.json,lib/src/Config/Env.php,lib/tests/Config/EnvTest.php,TASK.md
+verify: exit 0
+commit: 86ce15f
+learn: `Dotenv::createImmutable($path)` in phpdotenv 5.6 uses only EnvConst+ServerConst adapters by default — it ignores putenv'd values, so a shell-exported var (visible only via getenv()) gets silently overwritten by `.env`. Fix: build the repo manually with `RepositoryBuilder::createWithDefaultAdapters()->addAdapter(PutenvAdapter::class)->immutable()->make()` and pass to `Dotenv::create($repo, $dir)`. Test `testRealEnvOverridesDotenv` caught this — putenv-only simulation matches how Apache sets vhost env (it lands in $_SERVER, but also how shell exports look to PHP-FPM with `variables_order` excluding E). Also: adding a new dep to lib/ uses `composer update <pkg>` (manifest already edited by the +m step) rather than `composer require` (which double-edits composer.json).
+---
+
+## 6|INIT-06|PASS
++data/.gitkeep,logs/.gitkeep,TASK.md
+verify: exit 0
+commit: 44f633f
+learn: `.gitignore` `+m` step was a no-op this iteration — the allow-list lines `!/data/.gitkeep` and `!/logs/.gitkeep` (plus the `/data/*.csv` + `/logs/*.ndjson` deny patterns) were pre-staged during INIT-02's anchored-pattern fix. The procedure rule "git add {changed files}" means a `+m` listed in TASK.md is not a contract to dirty the file — only to verify the requirement holds. Committed scope stayed pure (2 sentinels, 0 byte content). Verify uses `test -d data && test -d logs` which is filesystem state, satisfied automatically once a file lands inside each directory.
+---
+
