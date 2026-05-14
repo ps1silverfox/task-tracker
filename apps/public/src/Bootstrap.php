@@ -180,10 +180,19 @@ final class Bootstrap
             BacklogController::class => static fn(ContainerInterface $c): BacklogController => new BacklogController(
                 $c->get(TaskRepository::class),
                 $c->get(TagRepository::class),
+                $c->get(RosterRepository::class),
+                $c->get(TeamRepository::class),
+                $c->get(SavedViewRepository::class),
+                $c->get(Environment::class),
             ),
             TaskDetailController::class => static fn(ContainerInterface $c): TaskDetailController => new TaskDetailController(
                 $c->get(TaskRepository::class),
                 $c->get(EventRepository::class),
+                $c->get(RosterRepository::class),
+                $c->get(TeamRepository::class),
+                $c->get(TagRepository::class),
+                $c->get(DependencyRepository::class),
+                $c->get(Environment::class),
             ),
             ExecutiveSummaryController::class => static fn(ContainerInterface $c): ExecutiveSummaryController => new ExecutiveSummaryController(
                 $c->get(ExecutiveSummary::class),
@@ -228,16 +237,4 @@ final class Bootstrap
 
             public function get(string $id): object
             {
-                if (array_key_exists($id, $this->cache)) {
-                    return $this->cache[$id];
-                }
-                if (!isset($this->factories[$id])) {
-                    throw new class("service not found: {$id}")
-                        extends RuntimeException
-                        implements NotFoundExceptionInterface {};
-                }
-                return $this->cache[$id] = ($this->factories[$id])($this);
-            }
-        };
-    }
-}
+                if (array_key_exists($id,

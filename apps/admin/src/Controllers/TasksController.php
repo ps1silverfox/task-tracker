@@ -9,23 +9,30 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use RuntimeException;
 use TaskTracker\Models\Enums;
+use TaskTracker\Models\Task;
 use TaskTracker\Repositories\DependencyRepository;
+use TaskTracker\Repositories\RosterRepository;
 use TaskTracker\Repositories\TagRepository;
 use TaskTracker\Repositories\TaskRepository;
+use TaskTracker\Repositories\TeamRepository;
+use Twig\Environment;
 
 /**
- * Admin tasks controller — POST /tasks (create), GET / (list), GET /tasks/{id} (read),
- * POST /tasks/{id} (update, ADMIN-03), DELETE /tasks/{id} (soft-delete, ADMIN-03).
+ * Admin tasks controller — full CRUD (ADMIN-02, ADMIN-03, ADMIN-04, UI-01, UI-02, UI-03).
  *
- * Twig templates land in ADMIN-09; until then list/show emit a minimal inline HTML
- * skeleton so that routing, container wiring, and the two-write audit can be
- * exercised end-to-end without pulling Twig in prematurely.
- *
- * Error responses follow spec §6: JSON body {error, message}. 422 is used for both
- * missing-required-field (InvalidArgumentException) and conflict (RuntimeException
- * — e.g. duplicate slug) because the spec only enumerates these two failure modes
- * for write endpoints and the distinction is carried in `error`. Repository
- * "not found" RuntimeExceptions map to 404.
+ * GET /         → backlog list with optional filter bar (UI-03)
+ * GET /tasks/new    → blank create form
+ * GET /tasks/{id}   → edit form pre-populated with current task state
+ * POST /tasks        → create (PRG → /tasks/{id})
+ * POST /tasks/{id}  → sparse update (PRG → /tasks/{id})
+ * DELETE /tasks/{id} → soft-delete (PRG → /)
+ * POST /tasks/{id}/delete → soft-delete via HTML form (PRG → /)
+ * POST /tasks/{id}/assign       → assign/unassign (PRG → /tasks/{id})
+ * POST /tasks/{id}/status       → change status (PRG → /tasks/{id})
+ * POST /tasks/{id}/dependencies → add prereq edge (PRG → /tasks/{id})
+ * DELETE /tasks/{id}/dependencies/{prereq_id} → remove edge (PRG → /tasks/{id})
+ * POST /tasks/{id}/tags         → add tag (PRG → /tasks/{id})
+ * DELETE /tasks/{id}/tags/{tag} → remove tag (PRG → /tasks/{id})
  */
 final class TasksController
 {
@@ -33,31 +40,53 @@ final class TasksController
         private readonly TaskRepository $tasks,
         private readonly DependencyRepository $dependencies,
         private readonly TagRepository $tagsRepo,
+        private readonly RosterRepository $roster,
+        private readonly TeamRepository $teams,
+        private readonly Environment $twig,
     ) {
     }
 
     public function list(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
     {
-        $tasks = $this->tasks->listLive();
+        $params  = $request->getQueryParams();
+        $allLive = $this->tasks->listLive();
+        $tasks   = $this->applyFilter($allLive, $params);
 
-        $html  = '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-              .  '<title>Backlog</title></head><body>';
-        $html .= '<h1>Backlog</h1>';
-        $html .= '<table><thead><tr>'
-              .  '<th>ID</th><th>Slug</th><th>Title</th><th>Status</th><th>Priority</th>'
-              .  '</tr></thead><tbody>';
-        foreach ($tasks as $task) {
-            $html .= sprintf(
-                '<tr data-id="%s"><td>%s</td><td>%s</td><td>%s</td><td>%s</td><td>%s</td></tr>',
-                self::esc($task->id),
-                self::esc($task->id),
-                self::esc($task->slug),
-                self::esc($task->title),
-                self::esc($task->status),
-                self::esc($task->priority),
-            );
+        $assigneeMap = [];
+        foreach ($this->roster->listAll() as $m) {
+            $assigneeMap[$m->id] = $m->name;
         }
-        $html .= '</tbody></table></body></html>';
+        $teamMap = [];
+        $teams   = $this->teams->listAll();
+        foreach ($teams as $t) {
+            $teamMap[$t->id] = $t->name;
+        }
+
+        $html = $this->twig->render('backlog.twig', [
+            'tasks'         => $tasks,
+            'assigneeMap'   => $assigneeMap,
+            'teamMap'       => $teamMap,
+            'activeFilters' => $params,
+            'roster'        => $this->roster->listAll(),
+            'teams'         => $teams,
+        ]);
+
+        $response->getBody()->write($html);
+        return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+    }
+
+    public function newForm(ServerRequestInterface $request, ResponseInterface $response): ResponseInterface
+    {
+        $html = $this->twig->render('task_edit.twig', [
+            'task'          => null,
+            'statuses'      => Enums::STATUSES_LIVE,
+            'priorities'    => Enums::PRIORITIES,
+            'roster'        => $this->roster->listAll(),
+            'teams'         => $this->teams->listAll(),
+            'currentTags'   => [],
+            'currentDeps'   => [],
+            'parentOptions' => $this->tasks->listLive(),
+        ]);
 
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
@@ -68,24 +97,35 @@ final class TasksController
      */
     public function show(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $id = (string) ($args['id'] ?? '');
+        $id   = (string) ($args['id'] ?? '');
         $task = $this->tasks->find($id);
         if ($task === null) {
             return $this->jsonError($response->withStatus(404), 'not_found', "task not found: {$id}");
         }
 
-        $html  = '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-              .  '<title>' . self::esc($task->title) . '</title></head><body>';
-        $html .= '<article data-id="' . self::esc($task->id) . '">';
-        $html .= '<h1>' . self::esc($task->title) . '</h1>';
-        $html .= '<dl>';
-        $html .= '<dt>Slug</dt><dd>'     . self::esc($task->slug)     . '</dd>';
-        $html .= '<dt>Status</dt><dd>'   . self::esc($task->status)   . '</dd>';
-        $html .= '<dt>Priority</dt><dd>' . self::esc($task->priority) . '</dd>';
-        if ($task->body !== null) {
-            $html .= '<dt>Body</dt><dd>' . self::esc($task->body) . '</dd>';
+        $currentTags = $this->tagsRepo->tagsOf($id);
+        $currentDeps = [];
+        foreach ($this->dependencies->prereqsOf($id) as $prereqId) {
+            $dep = $this->tasks->find($prereqId);
+            if ($dep !== null) {
+                $currentDeps[] = $dep;
+            }
         }
-        $html .= '</dl></article></body></html>';
+        $parentOptions = array_values(array_filter(
+            $this->tasks->listLive(),
+            static fn(Task $t): bool => $t->id !== $id,
+        ));
+
+        $html = $this->twig->render('task_edit.twig', [
+            'task'          => $task,
+            'statuses'      => Enums::STATUSES_LIVE,
+            'priorities'    => Enums::PRIORITIES,
+            'roster'        => $this->roster->listAll(),
+            'teams'         => $this->teams->listAll(),
+            'currentTags'   => $currentTags,
+            'currentDeps'   => $currentDeps,
+            'parentOptions' => $parentOptions,
+        ]);
 
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
@@ -112,9 +152,7 @@ final class TasksController
     }
 
     /**
-     * POST /tasks/{id} — partial update. Form fields are sparse: only keys actually
-     * present in the body are forwarded to the repository, so omitted fields keep
-     * their current values (vs. create which defaults missing fields to null).
+     * POST /tasks/{id} — partial update (sparse: only present keys forwarded).
      *
      * @param array<string, string> $args
      */
@@ -135,9 +173,6 @@ final class TasksController
         } catch (InvalidArgumentException $e) {
             return $this->jsonError($response->withStatus(422), 'invalid_field', $e->getMessage());
         } catch (RuntimeException $e) {
-            // TaskRepository::update raises RuntimeException for both "not found" (a
-            // race after our find() pre-check) and "slug not unique". The 404 vs 422
-            // distinction is duck-typed off the message — see ADMIN-02 docblock.
             if (str_contains($e->getMessage(), 'not found')) {
                 return $this->jsonError($response->withStatus(404), 'not_found', $e->getMessage());
             }
@@ -150,9 +185,7 @@ final class TasksController
     }
 
     /**
-     * DELETE /tasks/{id} — soft-delete (STATUS → `deleted`). Idempotent at the
-     * repository layer; controller redirects to the backlog after either a fresh
-     * delete or a no-op re-delete.
+     * DELETE /tasks/{id} and POST /tasks/{id}/delete — soft-delete.
      *
      * @param array<string, string> $args
      */
@@ -177,11 +210,6 @@ final class TasksController
     /**
      * POST /tasks/{id}/assign — body: {assignee_id|null}.
      *
-     * `assignee_id` must be present in the body (empty string or "null" → unassign).
-     * Goes through TaskRepository::update so the FIRST_ASSIGNED_AT /
-     * LAST_ASSIGNMENT_CHANGE_AT semantics and the task.assigned/reassigned/unassigned
-     * event emission both happen inside the same transaction as the CSV write.
-     *
      * @param array<string, string> $args
      */
     public function assign(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
@@ -196,9 +224,7 @@ final class TasksController
             return $this->jsonError($response->withStatus(422), 'invalid_field', 'missing required field: assignee_id');
         }
 
-        $raw = $body['assignee_id'];
-        // Treat the literal string "null" the same as PHP null so HTML forms (which
-        // can't send a true null) can still express "unassign".
+        $raw      = $body['assignee_id'];
         $assignee = ($raw === null || $raw === '' || $raw === 'null') ? null : (string) $raw;
 
         try {
@@ -216,10 +242,6 @@ final class TasksController
 
     /**
      * POST /tasks/{id}/status — body: {status}.
-     *
-     * Validates against STATUSES_LIVE so `deleted` cannot be reached through the
-     * status endpoint; soft-delete must go through DELETE /tasks/{id}. The
-     * repository's COMPLETED_AT semantics fire when the target is `done`.
      *
      * @param array<string, string> $args
      */
@@ -254,10 +276,7 @@ final class TasksController
     }
 
     /**
-     * POST /tasks/{id}/dependencies — body: {prereq_id}. Adds edge "id requires prereq_id".
-     *
-     * Cycle prevention and duplicate-edge rejection happen inside
-     * DependencyRepository::add under the CsvStore flock; both surface as 422.
+     * POST /tasks/{id}/dependencies — body: {prereq_id}.
      *
      * @param array<string, string> $args
      */
@@ -291,13 +310,13 @@ final class TasksController
     }
 
     /**
-     * DELETE /tasks/{id}/dependencies/{prereq_id} — idempotent edge removal.
+     * DELETE /tasks/{id}/dependencies/{prereq_id}.
      *
      * @param array<string, string> $args
      */
     public function removeDependency(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $id = (string) ($args['id'] ?? '');
+        $id       = (string) ($args['id'] ?? '');
         $prereqId = (string) ($args['prereq_id'] ?? '');
         if ($id === '' || $this->tasks->find($id) === null) {
             return $this->jsonError($response->withStatus(404), 'not_found', "task not found: {$id}");
@@ -318,7 +337,7 @@ final class TasksController
     }
 
     /**
-     * POST /tasks/{id}/tags — body: {tag}. Tag is normalized to lower-kebab.
+     * POST /tasks/{id}/tags — body: {tag}.
      *
      * @param array<string, string> $args
      */
@@ -348,13 +367,13 @@ final class TasksController
     }
 
     /**
-     * DELETE /tasks/{id}/tags/{tag} — idempotent detach.
+     * DELETE /tasks/{id}/tags/{tag}.
      *
      * @param array<string, string> $args
      */
     public function removeTag(ServerRequestInterface $request, ResponseInterface $response, array $args): ResponseInterface
     {
-        $id = (string) ($args['id'] ?? '');
+        $id  = (string) ($args['id'] ?? '');
         $tag = (string) ($args['tag'] ?? '');
         if ($id === '' || $this->tasks->find($id) === null) {
             return $this->jsonError($response->withStatus(404), 'not_found', "task not found: {$id}");
@@ -374,70 +393,87 @@ final class TasksController
             ->withHeader('Location', '/tasks/' . rawurlencode($id));
     }
 
+    // -------------------------------------------------------------------------
+    // Private helpers
+    // -------------------------------------------------------------------------
+
     /**
-     * Map spec snake_case form fields to TaskRepository's camelCase input shape.
+     * Apply simple query-string filters to the live task list.
+     * Supports: status, priority, team_id, assignee_id, tags (comma-separated).
      *
+     * @param list<Task>           $tasks
+     * @param array<string, mixed> $params
+     * @return list<Task>
+     */
+    private function applyFilter(array $tasks, array $params): array
+    {
+        $status   = self::csvParam($params, 'status');
+        $priority = self::csvParam($params, 'priority');
+        $teamId   = isset($params['team_id'])    && is_string($params['team_id'])    && $params['team_id']    !== '' ? $params['team_id']    : null;
+        $assignee = isset($params['assignee_id']) && is_string($params['assignee_id']) && $params['assignee_id'] !== '' ? $params['assignee_id'] : null;
+        $tags     = self::csvParam($params, 'tags');
+
+        // Build tag → taskId set if tag filter active
+        $taggedIds = null;
+        if ($tags !== null) {
+            $taggedIds = [];
+            foreach ($this->tagsRepo->listAll() as $row) {
+                if (in_array($row['tag'], $tags, true)) {
+                    $taggedIds[$row['taskId']] = true;
+                }
+            }
+        }
+
+        $out = [];
+        foreach ($tasks as $t) {
+            if ($status !== null && !in_array($t->status, $status, true)) {
+                continue;
+            }
+            if ($priority !== null && !in_array($t->priority, $priority, true)) {
+                continue;
+            }
+            if ($teamId !== null && $t->teamId !== $teamId) {
+                continue;
+            }
+            if ($assignee !== null && $t->assigneeId !== $assignee) {
+                continue;
+            }
+            if ($taggedIds !== null && !isset($taggedIds[$t->id])) {
+                continue;
+            }
+            $out[] = $t;
+        }
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     * @return list<string>|null
+     */
+    private static function csvParam(array $params, string $key): ?array
+    {
+        if (!array_key_exists($key, $params)) {
+            return null;
+        }
+        $raw = $params[$key];
+        if (!is_string($raw) || $raw === '') {
+            return null;
+        }
+        $out = [];
+        foreach (explode(',', $raw) as $piece) {
+            $piece = trim($piece);
+            if ($piece !== '') {
+                $out[] = $piece;
+            }
+        }
+        return $out === [] ? null : $out;
+    }
+
+    /**
      * @param array<string, mixed> $body
      * @return array<string, mixed>
      */
     private static function normalizeInput(array $body): array
     {
         return [
-            'slug'        => $body['slug']         ?? null,
-            'title'       => $body['title']        ?? null,
-            'body'        => $body['body']         ?? null,
-            'status'      => $body['status']       ?? null,
-            'priority'    => $body['priority']     ?? null,
-            'dueDate'     => $body['due_date']     ?? null,
-            'effortHours' => $body['effort_hours'] ?? null,
-            'url'         => $body['url']          ?? null,
-            'parentId'    => $body['parent_id']    ?? null,
-            'assigneeId'  => $body['assignee_id']  ?? null,
-            'teamId'      => $body['team_id']      ?? null,
-        ];
-    }
-
-    /**
-     * Sparse counterpart to normalizeInput: only forwards keys actually present in
-     * the form body. Required because TaskRepository::update interprets every key
-     * in its $changes array as an explicit set — including null/empty.
-     *
-     * @param array<string, mixed> $body
-     * @return array<string, mixed>
-     */
-    private static function normalizeUpdateInput(array $body): array
-    {
-        $map = [
-            'slug'         => 'slug',
-            'title'        => 'title',
-            'body'         => 'body',
-            'status'       => 'status',
-            'priority'     => 'priority',
-            'due_date'     => 'dueDate',
-            'effort_hours' => 'effortHours',
-            'url'          => 'url',
-            'parent_id'    => 'parentId',
-            'assignee_id'  => 'assigneeId',
-            'team_id'      => 'teamId',
-        ];
-        $out = [];
-        foreach ($map as $formKey => $repoKey) {
-            if (array_key_exists($formKey, $body)) {
-                $out[$repoKey] = $body[$formKey];
-            }
-        }
-        return $out;
-    }
-
-    private function jsonError(ResponseInterface $response, string $code, string $message): ResponseInterface
-    {
-        $payload = json_encode(['error' => $code, 'message' => $message], JSON_THROW_ON_ERROR);
-        $response->getBody()->write($payload);
-        return $response->withHeader('Content-Type', 'application/json; charset=utf-8');
-    }
-
-    private static function esc(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
-    }
-}
+            'slug'        => $body['slug'

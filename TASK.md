@@ -440,3 +440,105 @@ deps: INT-04
 deps: INT-01, INT-02, INT-03, PUB-09
 !v ./vendor/bin/phpunit
 !c chore: v1.0 acceptance — all tests green
+
+---
+
+## Phase 8 — UI wiring & completion (production-ready UI)
+
+> **Context:** Phases 0–7 built the skeleton — storage, controllers, repositories, aggregations, and Twig templates — but all admin and public controllers still return raw inline HTML strings from the test scaffold. The Twig templates in `apps/admin/src/Templates/` and `apps/public/src/Templates/` exist but are never called. Phase 8 wires the templates to the controllers and completes the UI to a usable standard.
+>
+> **Definition of done for this phase:** A real user can open either app in a browser, navigate every screen without knowing a URL, create and manage tasks end-to-end, and see real names (not UUIDs) everywhere. No inline HTML string building in any controller.
+
+### [x] UI-01 Wire Twig into admin app bootstrap + all admin controllers
+- Add `slim/twig-view` to `apps/admin/composer.json` if not already present; register `Twig` middleware and `$container->get(Twig::class)` in `Bootstrap.php`
+- Update `TasksController::list()`, `show()`, `create()` to call `$this->view->render($response, 'backlog.twig', [...])` / `task_edit.twig` — remove all inline HTML string building
+- Update `RosterController`, `TeamsController`, `SavedViewsController`, `HealthController` to render their respective Twig templates
+- Every controller must resolve UUIDs to names before passing to template: load roster + teams, build `$assigneeMap[uuid => name]` and `$teamMap[uuid => name]`; pass both maps to every template that needs them
+deps: ADMIN-09
+!v cd apps/admin && ./vendor/bin/phpunit && php -r "require 'vendor/autoload.php'; echo 'Twig registered';"
+!c feat(admin): wire Twig to all admin controllers; resolve assignee/team UUIDs to names
+
+### [x] UI-02 Complete admin task edit form
+- `task_edit.twig`: `<select name="assignee_id">` populated from roster (active members); `<select name="team_id">` populated from teams; `<select name="parent_id">` populated from live tasks (excluding self); tags input (`<input name="tags">` comma-separated, pre-filled from current tags); dependencies section listing current prereqs with remove buttons and an "add prerequisite" lookup
+- `TasksController::show()` must fetch and pass: `$rosterOptions`, `$teamOptions`, `$parentOptions`, `$currentTags`, `$currentDeps` to the template
+deps: UI-01
+!v cd apps/admin && ./vendor/bin/phpunit tests/Controllers/TasksControllerCreateTest.php tests/Controllers/TasksControllerUpdateTest.php
+!c feat(admin): complete task edit form — assignee/team/parent dropdowns, tags, dependencies
+
+### [x] UI-03 Complete admin backlog with filter + saved views sidebar
+- `backlog.twig`: add filter bar above table — `<select>` for status, priority, team, assignee; `<input>` for tag search; filter state passed from controller via query string `?status=open&priority=high` etc.
+- `TasksController::list()` must read query params and pass filtered task list + active filter values back to template for pre-selection
+- Add saved views to nav: `BacklogController::list()` fetches all saved views and passes to layout as `$savedViews`; `layout.twig` renders them in nav dropdown
+- Assignee column: render resolved name, not UUID
+deps: UI-01
+!v cd apps/admin && ./vendor/bin/phpunit tests/Controllers/TasksControllerCreateTest.php
+!c feat(admin): backlog filter bar + saved views nav + resolved assignee names
+
+### [x] UI-04 Complete roster and teams admin screens
+- `roster.twig`: table of all members (name, email, team, active/inactive badge) + inline "Add member" form at bottom + deactivate button per row; form POSTs to `POST /roster`
+- `teams.twig`: table of teams (name, description, member count) + inline "Add team" form; form POSTs to `POST /teams`
+- `RosterController` and `TeamsController` must pass all required data and render templates (not inline HTML)
+deps: UI-01
+!v cd apps/admin && ./vendor/bin/phpunit tests/Controllers/RosterControllerTest.php tests/Controllers/TeamsControllerTest.php
+!c feat(admin): complete roster + teams screens with add/deactivate forms
+
+### [x] UI-05 Wire Twig into public app bootstrap + all public controllers
+- Same Twig registration pattern as UI-01 for `apps/public/`
+- `BacklogController`, `TaskDetailController`, `ExecutiveSummaryController`, `GraphController`, `ExportController`, `SavedViewsController`, `HealthController` all render templates — remove all inline HTML
+- Every controller resolves UUIDs to names before passing to template
+deps: PUB-08
+!v cd apps/public && ./vendor/bin/phpunit
+!c feat(public): wire Twig to all public controllers; resolve UUIDs to names
+
+### [x] UI-06 Public backlog filter controls
+- `backlog.twig` (public): add filter sidebar or top bar — status checkboxes, priority checkboxes, team select, assignee select, tag input, due-within-days input; all pre-populated from current query string
+- `BacklogController::list()` reads query params, filters task list, passes active filter values back to template
+- Saved views listed in nav for one-click filter application
+deps: UI-05
+!v cd apps/public && ./vendor/bin/phpunit tests/Controllers/BacklogControllerTest.php
+!c feat(public): filter controls on public backlog + saved views nav
+
+### [x] UI-07 Complete public task detail page
+- `task_detail.twig`: render task body as HTML (Markdown via `league/commonmark`); activity feed timeline from NDJSON events (timestamp, action label, actor); tags as badges; list of prerequisite tasks (linked); list of subtasks (linked); assignee name + team name resolved
+- `TaskDetailController::show()` fetches events from `EventRepository`, resolves all UUIDs to names, renders Markdown body, passes all to template
+deps: UI-05
+!v cd apps/public && ./vendor/bin/phpunit tests/Controllers/TaskDetailControllerTest.php
+!c feat(public): complete task detail — Markdown body, activity feed, tags, dependencies, subtasks
+
+### [x] UI-08 Complete executive summary page with Chart.js
+- `summary.twig`: date range inputs (`from`, `to`), period selector (`day/month/quarter/year`), person select, team select; all pre-populated from query params; Chart.js stacked bar chart rendered with real bucket data from `ExecutiveSummary`; summary table below chart; "Export CSV" link to `/summary.csv`
+- `ExecutiveSummaryController` must pass chart-ready data array (labels + four series arrays) alongside the table rows
+deps: UI-05
+!v cd apps/public && ./vendor/bin/phpunit tests/Controllers/ExecutiveSummaryControllerTest.php
+!c feat(public): complete executive summary — Chart.js stacked bar + filter controls
+
+### [x] UI-09 Complete dependency graph page
+- `graph.twig`: cytoscape.js canvas full-width; JS fetches `/graph.json` on load and renders with dagre layout; node fill = status color, node border = priority color, node label = title (40 char truncated), click → navigate to `/tasks/{id}`; filter controls above canvas (status multi-select, team select, root subtree input); banner if node count > 500
+- `GraphController::graph()` returns HTML page; `GraphController::json()` returns cytoscape JSON from `DependencyGraph`
+deps: UI-05
+!v cd apps/public && ./vendor/bin/phpunit tests/Controllers/GraphControllerTest.php
+!c feat(public): complete dependency graph — cytoscape.js with status/priority encoding + filters
+
+### [x] UI-10 Seed meaningful demo data
+- Update `tools/seed.php` to create: 2 teams, 4 roster members (2 per team), 8 tasks (mix of statuses/priorities, 2 with parent, 2 with dependencies, 1 blocked, 1 done), 2 saved views
+- Goal: every screen has real data to display on a fresh seed so visual QA is meaningful
+deps: TOOL-01
+!v php tools/seed.php --target=tests/integration/.tmp-seed && php -r "\$rows = array_map('str_getcsv', file('tests/integration/.tmp-seed/tasks.csv')); echo count(\$rows) >= 9 ? 'OK' : 'FAIL';"
+!c feat(tools): seed meaningful demo data — 2 teams, 4 members, 8 tasks with deps/hierarchy
+
+### [x] UI-11 Mobile-responsive verification + fixes
+- Boot public app, load backlog and task detail at 390px viewport width (use PHP built-in server `php -S localhost:8090 -t apps/public/public`)
+- Verify table collapses gracefully (Bootstrap `table-responsive` wrapper present), nav collapses to hamburger, task detail readable on narrow viewport
+- Fix any layout breaks found
+deps: UI-05, UI-06, UI-07
+!v cd apps/public && php -S localhost:8090 -t public &>/dev/null & sleep 1 && curl -s http://localhost:8090/ | grep -q 'viewport' && echo OK; kill %1
+!c fix(public): mobile-responsive layout — verify and fix narrow viewport rendering
+
+### [x] UI-12 Phase 8 acceptance — visual smoke + full test suite
+- Run `./vendor/bin/phpunit` (all phases) — must be green
+- Run `php tools/seed.php` on clean data dir, boot both apps via PHP built-in server, curl every route listed in spec §6, assert HTTP 200 (or 405 where expected)
+- Verify: no inline HTML string building remains in any controller (grep check)
+- Write `phase_8_ready.txt` with timestamp and test counts
+deps: UI-01 through UI-11
+!v grep -r 'getBody()->write.*<!doctype' apps/admin/src apps/public/src && echo "FAIL: inline HTML remains" || echo "OK: all controllers use Twig"
+!c chore: phase 8 acceptance — all controllers use Twig, all screens render real data

@@ -1,0 +1,68 @@
+{% extends 'layout.twig' %}
+
+{% block title %}Saved Views · Admin{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Saved Views <span class="badge bg-secondary">{{ views|length }}</span></h1>
+</div>
+
+<div class="row">
+    <div class="col-lg-8">
+        {% if views is empty %}
+            <div class="alert alert-info">No saved views yet.</div>
+        {% else %}
+        <table class="table table-striped align-middle">
+            <thead class="table-dark">
+                <tr>
+                    <th>Name</th>
+                    <th>Created</th>
+                    <th>Filter</th>
+                    <th class="text-end">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for v in views %}
+                <tr data-id="{{ v.id }}">
+                    <td>{{ v.name }}</td>
+                    <td><time>{{ v.createdAt }}</time></td>
+                    <td><code class="small">{{ v.filter|json_encode }}</code></td>
+                    <td class="text-end">
+                        <form method="post" action="/saved-views/{{ v.id|url_encode }}/delete" class="d-inline">
+                            <button type="submit" class="btn btn-outline-danger btn-sm"
+                                    onclick="return confirm('Delete this saved view?');">
+                                Delete
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        {% endif %}
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">Create saved view</div>
+            <div class="card-body">
+                <form method="post" action="/saved-views" class="row g-3">
+                    <div class="col-12">
+                        <label for="sv-name" class="form-label">Name</label>
+                        <input type="text" id="sv-name" name="name" class="form-control" required>
+                    </div>
+                    <div class="col-12">
+                        <label for="sv-filter" class="form-label">Filter JSON</label>
+                        <textarea id="sv-filter" name="filter" class="form-control font-monospace" rows="3"
+                                  placeholder='{"status":["open"]}'></textarea>
+                        <div class="form-text">Paste a FILTER_JSON object or leave blank for no filter.</div>
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

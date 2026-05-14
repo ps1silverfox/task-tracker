@@ -23,11 +23,13 @@
                 </tr>
             </thead>
             <tbody>
+                {% set teamMap = {} %}
+                {% for t in teams %}{% set teamMap = teamMap|merge({(t.id): t.name}) %}{% endfor %}
                 {% for m in members %}
                 <tr data-id="{{ m.id }}">
                     <td>{{ m.name }}</td>
                     <td>{{ m.email ?? '—' }}</td>
-                    <td>{{ m.teamId ?? '—' }}</td>
+                    <td>{{ teamMap[m.teamId] ?? m.teamId ?? '—' }}</td>
                     <td>
                         {% if m.active %}
                             <span class="badge bg-success">active</span>

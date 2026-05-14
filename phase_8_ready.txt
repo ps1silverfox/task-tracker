@@ -1,0 +1,68 @@
+Phase 8 — UI Implementation — READY
+====================================
+Completed: 2026-05-13
+
+Tasks completed
+---------------
+UI-01  Wire Twig into admin app bootstrap + all admin controllers
+UI-02  Complete admin task edit form (assignee/team/parent dropdowns, tags, dependencies)
+UI-03  Complete admin backlog with filter bar + saved views sidebar
+UI-04  Complete roster and teams admin screens
+UI-05  Wire Twig into public app bootstrap + all public controllers
+UI-06  Public backlog filter controls (status, priority, team, assignee, tags)
+UI-07  Complete public task detail page (activity feed, tags, prereqs, subtasks)
+UI-08  Complete executive summary page with Chart.js stacked-bar chart
+UI-09  Complete dependency graph page (cytoscape.js + dagre layout)
+UI-10  Seed meaningful demo data (2 teams, 4 members, 8 tasks, deps, tags, 2 views)
+UI-11  Mobile-responsive layout verified (Bootstrap table-responsive + navbar collapse)
+UI-12  Phase 8 acceptance
+
+Acceptance checks
+-----------------
+  grep -r 'getBody()->write.*<!doctype' apps/admin/src apps/public/src
+  → OK: no inline HTML string building remains in any controller
+
+  All controllers now follow the Twig render pattern:
+    $html = $this->twig->render('template.twig', [...]);
+    $response->getBody()->write($html);
+    return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
+
+  Viewport meta tag present in both layout.twig files:
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  Bootstrap table-responsive wrappers present on all data tables.
+
+  Seed demo data (UI-10):
+    - 2 teams:   "Example Team" (Engineering), "Product"
+    - 4 members: Example Member, Alice Chen, Bob Smith, Carol Davis
+    - 8 tasks:   ci-pipeline (done), db-schema (done), auth (in_progress, critical),
+                 rest-api (in_progress), user-dashboard (open, child of rest-api),
+                 api-docs (open, child of rest-api), perf-testing (blocked),
+                 deploy-prod (open, critical)
+    - Tags:      auth/security on #auth; api/backend on #rest-api;
+                 testing/performance on #perf-testing; deployment/critical on #deploy-prod
+    - Deps:      perf-testing ← auth, perf-testing ← rest-api, deploy-prod ← perf-testing
+    - 2 saved views: "Open & In Progress", "Critical Priority"
+
+Files changed in Phase 8
+-------------------------
+apps/admin/src/Bootstrap.php                  (controller DI wired with Twig + repos)
+apps/admin/src/routes.php                     (added /tasks/new, POST delete fallbacks)
+apps/admin/src/Controllers/TasksController.php
+apps/admin/src/Controllers/RosterController.php
+apps/admin/src/Controllers/TeamsController.php
+apps/admin/src/Controllers/SavedViewsController.php
+apps/admin/src/Templates/layout.twig          (saved views nav link)
+apps/admin/src/Templates/backlog.twig         (filter bar, resolved names)
+apps/admin/src/Templates/task_edit.twig       (dropdowns, tags, deps sections)
+apps/admin/src/Templates/roster.twig          (team name resolution)
+apps/admin/src/Templates/saved_views.twig     (new template)
+apps/public/src/Bootstrap.php                 (controller DI wired with repos)
+apps/public/src/Controllers/BacklogController.php
+apps/public/src/Controllers/TaskDetailController.php
+apps/public/src/Templates/backlog.twig        (filter bar, saved views, resolved names)
+apps/public/src/Templates/task_detail.twig    (tags, prereqs, subtasks, resolved names)
+apps/public/src/Templates/summary.twig        (extends layout, Bootstrap, responsive chart)
+apps/public/src/Templates/graph.twig          (extends layout, Bootstrap filter controls)
+tools/seed.php                                (richer demo data)
+TASK.md                                       (UI-01 through UI-12 marked [x])

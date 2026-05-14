@@ -2,10 +2,19 @@
 
 {% block title %}{{ task.title }} &middot; Task Tracker{% endblock %}
 
-{% block content %}
-{% set status_colors = {'open': 'secondary', 'in_progress': 'primary', 'blocked': 'warning', 'done': 'success'} %}
+{% set status_colors   = {'open': 'secondary', 'in_progress': 'primary', 'blocked': 'warning', 'done': 'success'} %}
 {% set priority_colors = {'low': 'info', 'med': 'secondary', 'high': 'warning', 'critical': 'danger'} %}
 
+{# Defaults for optional context vars so direct template rendering stays safe #}
+{% set tags        = tags        ?? [] %}
+{% set prereqs     = prereqs     ?? [] %}
+{% set subtasks    = subtasks    ?? [] %}
+{% set assigneeMap = assigneeMap ?? {} %}
+{% set teamMap     = teamMap     ?? {} %}
+{% set assigneeName = assigneeName ?? (assigneeMap[task.assigneeId] ?? task.assigneeId ?? null) %}
+{% set teamName     = teamName     ?? (teamMap[task.teamId]         ?? task.teamId     ?? null) %}
+
+{% block content %}
 <div class="mb-3">
     <a class="btn btn-link btn-sm px-0" href="/">&larr; Back to backlog</a>
 </div>
@@ -16,6 +25,9 @@
     <span class="badge bg-{{ status_colors[task.status]|default('secondary') }}">{{ task.status }}</span>
     <span class="badge bg-{{ priority_colors[task.priority]|default('secondary') }}">{{ task.priority }}</span>
     {% if task.slug %}<span class="badge bg-light text-dark border"><code>{{ task.slug }}</code></span>{% endif %}
+    {% for tag in tags %}
+        <span class="badge bg-primary">{{ tag }}</span>
+    {% endfor %}
 </div>
 
 <div class="row g-3 mb-4">
@@ -30,11 +42,11 @@
     <div class="col-md-6">
         <dl class="row task-fields mb-0">
             <dt class="col-sm-4">Parent</dt>      <dd class="col-sm-8">{{ task.parentId ?? '—' }}</dd>
-            <dt class="col-sm-4">Assignee</dt>    <dd class="col-sm-8">{{ task.assigneeId ?? '—' }}</dd>
-            <dt class="col-sm-4">Team</dt>        <dd class="col-sm-8">{{ task.teamId ?? '—' }}</dd>
+            <dt class="col-sm-4">Assignee</dt>    <dd class="col-sm-8">{{ assigneeName ?? '—' }}</dd>
+            <dt class="col-sm-4">Team</dt>        <dd class="col-sm-8">{{ teamName ?? '—' }}</dd>
             <dt class="col-sm-4">Created</dt>     <dd class="col-sm-8"><time>{{ task.createdAt }}</time></dd>
             <dt class="col-sm-4">Updated</dt>     <dd class="col-sm-8"><time>{{ task.updatedAt }}</time></dd>
-            <dt class="col-sm-4">Completed</dt>   <dd class="col-sm-8">{{ task.completedAt ? '<time>' ~ task.completedAt ~ '</time>'|raw : '—' }}</dd>
+            <dt class="col-sm-4">Completed</dt>   <dd class="col-sm-8">{% if task.completedAt %}<time>{{ task.completedAt }}</time>{% else %}—{% endif %}</dd>
         </dl>
     </div>
 </div>
@@ -43,6 +55,34 @@
 <section class="task-body mb-4">
     <h2 class="h5">Body</h2>
     <pre class="border bg-white p-3 small">{{ task.body }}</pre>
+</section>
+{% endif %}
+
+{% if prereqs is not empty %}
+<section class="prereqs mb-4">
+    <h2 class="h5">Prerequisites</h2>
+    <ul class="list-group list-group-flush">
+        {% for p in prereqs %}
+        <li class="list-group-item px-0">
+            <a href="/tasks/{{ p.id|url_encode }}">{{ p.slug }} · {{ p.title }}</a>
+            <span class="badge bg-{{ status_colors[p.status]|default('secondary') }} ms-2">{{ p.status }}</span>
+        </li>
+        {% endfor %}
+    </ul>
+</section>
+{% endif %}
+
+{% if subtasks is not empty %}
+<section class="subtasks mb-4">
+    <h2 class="h5">Subtasks</h2>
+    <ul class="list-group list-group-flush">
+        {% for s in subtasks %}
+        <li class="list-group-item px-0">
+            <a href="/tasks/{{ s.id|url_encode }}">{{ s.slug }} · {{ s.title }}</a>
+            <span class="badge bg-{{ status_colors[s.status]|default('secondary') }} ms-2">{{ s.status }}</span>
+        </li>
+        {% endfor %}
+    </ul>
 </section>
 {% endif %}
 

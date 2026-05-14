@@ -1,77 +1,100 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Executive Summary &middot; Task Tracker</title>
-    <meta name="generator" content="task-tracker-public">
-</head>
-<body>
-<header>
-    <h1>Executive Summary</h1>
-    <p class="meta">
-        Period: <code>{{ period }}</code>
-        &middot; From: <time>{{ from }}</time>
-        &middot; To: <time>{{ to }}</time>
-        {%- if person %} &middot; Person: <code>{{ person }}</code>{% endif -%}
-        {%- if team %} &middot; Team: <code>{{ team }}</code>{% endif -%}
-    </p>
-</header>
+{% extends 'layout.twig' %}
 
-<form method="get" action="/summary" class="filters">
-    <label>Period
-        <select name="period">
-            <option value="day"     {% if period == 'day' %}selected{% endif %}>day</option>
-            <option value="month"   {% if period == 'month' %}selected{% endif %}>month</option>
-            <option value="quarter" {% if period == 'quarter' %}selected{% endif %}>quarter</option>
-            <option value="year"    {% if period == 'year' %}selected{% endif %}>year</option>
+{% block title %}Executive Summary &middot; Task Tracker{% endblock %}
+
+{# Defaults so direct template rendering stays safe #}
+{% set period = period ?? 'month' %}
+{% set from   = from   ?? '' %}
+{% set to     = to     ?? '' %}
+{% set person = person ?? null %}
+{% set team   = team   ?? null %}
+{% set rows   = rows   ?? [] %}
+{% set series = series ?? {labels:[], added:[], completed:[], assigned:[], unassigned:[]} %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h1 class="h3 mb-0">Executive Summary</h1>
+    <a class="btn btn-outline-secondary btn-sm"
+       href="/summary.csv?period={{ period|url_encode }}&from={{ from|url_encode }}&to={{ to|url_encode }}{% if person %}&person={{ person|url_encode }}{% endif %}{% if team %}&team={{ team|url_encode }}{% endif %}">Export CSV</a>
+</div>
+
+{# ── Filter bar ── #}
+<form method="get" action="/summary" class="row g-2 mb-4 align-items-end p-3 bg-white border rounded">
+    <div class="col-sm-6 col-md-2">
+        <label for="f-period" class="form-label small mb-1">Period</label>
+        <select id="f-period" name="period" class="form-select form-select-sm">
+            {% for p in ['day', 'month', 'quarter', 'year'] %}
+                <option value="{{ p }}"{% if period == p %} selected{% endif %}>{{ p }}</option>
+            {% endfor %}
         </select>
-    </label>
-    <label>From <input type="date" name="from" value="{{ from }}"></label>
-    <label>To   <input type="date" name="to"   value="{{ to }}"></label>
-    <label>Person <input type="text" name="person" value="{{ person|default('') }}" placeholder="roster id"></label>
-    <label>Team   <input type="text" name="team"   value="{{ team|default('') }}"   placeholder="team id"></label>
-    <button type="submit">Apply</button>
-    <a href="/summary.csv?period={{ period|url_encode }}&from={{ from|url_encode }}&to={{ to|url_encode }}{% if person %}&person={{ person|url_encode }}{% endif %}{% if team %}&team={{ team|url_encode }}{% endif %}">CSV</a>
+    </div>
+    <div class="col-sm-6 col-md-2">
+        <label for="f-from" class="form-label small mb-1">From</label>
+        <input id="f-from" type="date" name="from" class="form-control form-control-sm" value="{{ from }}">
+    </div>
+    <div class="col-sm-6 col-md-2">
+        <label for="f-to" class="form-label small mb-1">To</label>
+        <input id="f-to" type="date" name="to" class="form-control form-control-sm" value="{{ to }}">
+    </div>
+    <div class="col-sm-6 col-md-2">
+        <label for="f-person" class="form-label small mb-1">Person</label>
+        <input id="f-person" type="text" name="person" class="form-control form-control-sm"
+               placeholder="roster id" value="{{ person ?? '' }}">
+    </div>
+    <div class="col-sm-6 col-md-2">
+        <label for="f-team" class="form-label small mb-1">Team</label>
+        <input id="f-team" type="text" name="team" class="form-control form-control-sm"
+               placeholder="team id" value="{{ team ?? '' }}">
+    </div>
+    <div class="col-sm-6 col-md-2 d-flex gap-1">
+        <button type="submit" class="btn btn-sm btn-outline-primary flex-grow-1">Apply</button>
+        <a href="/summary" class="btn btn-sm btn-outline-secondary">Clear</a>
+    </div>
 </form>
 
-<section class="chart">
-    <canvas id="summary-chart" width="900" height="320"
-            data-labels="{{ series.labels|json_encode|e('html_attr') }}"
-            data-added="{{ series.added|json_encode|e('html_attr') }}"
-            data-completed="{{ series.completed|json_encode|e('html_attr') }}"
-            data-assigned="{{ series.assigned|json_encode|e('html_attr') }}"
-            data-unassigned="{{ series.unassigned|json_encode|e('html_attr') }}"></canvas>
-</section>
+{# ── Chart ── #}
+<div class="card mb-4">
+    <div class="card-body p-2">
+        <canvas id="summary-chart"
+                class="w-100"
+                style="max-height:320px"
+                data-labels="{{ series.labels|json_encode|e('html_attr') }}"
+                data-added="{{ series.added|json_encode|e('html_attr') }}"
+                data-completed="{{ series.completed|json_encode|e('html_attr') }}"
+                data-assigned="{{ series.assigned|json_encode|e('html_attr') }}"
+                data-unassigned="{{ series.unassigned|json_encode|e('html_attr') }}"></canvas>
+    </div>
+</div>
 
-<section class="table">
-    <table id="summary-table">
-        <thead>
+{# ── Summary table ── #}
+{% if rows is empty %}
+    <div class="alert alert-info" role="alert">No events in the selected date range.</div>
+{% else %}
+<div class="table-responsive">
+    <table class="table table-striped table-hover align-middle" id="summary-table">
+        <thead class="table-dark">
             <tr>
-                <th>Period</th>
-                <th>Added</th>
-                <th>Completed</th>
-                <th>Assigned</th>
-                <th>Unassigned</th>
+                <th scope="col">Period</th>
+                <th scope="col" class="text-end">Added</th>
+                <th scope="col" class="text-end">Completed</th>
+                <th scope="col" class="text-end">Assigned</th>
+                <th scope="col" class="text-end">Unassigned</th>
             </tr>
         </thead>
         <tbody>
-        {% if rows is empty %}
-            <tr class="empty"><td colspan="5">No events in range.</td></tr>
-        {% else %}
             {% for row in rows %}
             <tr data-period="{{ row.period }}">
-                <td>{{ row.period }}</td>
-                <td>{{ row.added }}</td>
-                <td>{{ row.completed }}</td>
-                <td>{{ row.assigned }}</td>
-                <td>{{ row.unassigned }}</td>
+                <td><code>{{ row.period }}</code></td>
+                <td class="text-end">{{ row.added }}</td>
+                <td class="text-end">{{ row.completed }}</td>
+                <td class="text-end">{{ row.assigned }}</td>
+                <td class="text-end">{{ row.unassigned }}</td>
             </tr>
             {% endfor %}
-        {% endif %}
         </tbody>
     </table>
-</section>
+</div>
+{% endif %}
 
 <script src="/vendor/chartjs/chart.umd.min.js"></script>
 <script>
@@ -83,7 +106,7 @@
     var completed  = JSON.parse(canvas.getAttribute('data-completed')  || '[]');
     var assigned   = JSON.parse(canvas.getAttribute('data-assigned')   || '[]');
     var unassigned = JSON.parse(canvas.getAttribute('data-unassigned') || '[]');
-    new Chart(canvas.getContext('2d'), {
+    new Chart(canvas, {
         type: 'bar',
         data: {
             labels: labels,
@@ -95,12 +118,12 @@
             ]
         },
         options: {
-            responsive: false,
+            responsive: true,
+            maintainAspectRatio: false,
             scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true } },
             plugins: { legend: { position: 'top' } }
         }
     });
 })();
 </script>
-</body>
-</html>
+{% endblock %}

@@ -11,41 +11,41 @@ use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use TaskTracker\Models\Enums;
 use TaskTracker\Models\Task;
+use TaskTracker\Repositories\RosterRepository;
+use TaskTracker\Repositories\SavedViewRepository;
 use TaskTracker\Repositories\TagRepository;
 use TaskTracker\Repositories\TaskRepository;
+use TaskTracker\Repositories\TeamRepository;
+use Twig\Environment;
 
 /**
  * Public backlog listing — GET / with query-string filters (spec §5 FILTER_JSON, §6 public).
+ * Renders backlog.twig via Twig (UI-05, UI-06).
  *
- * Filter axes mapped from query string to FILTER_JSON shape:
- *   ?status=open,in_progress    list<string>  (subset of STATUSES_LIVE)
- *   ?priority=high,critical     list<string>  (subset of PRIORITIES)
+ * Filter axes:
+ *   ?status=open,in_progress    list<string>  subset of STATUSES_LIVE
+ *   ?priority=high,critical     list<string>  subset of PRIORITIES
  *   ?team_id=<uuid>             string        (literal "null" → match teamless rows)
  *   ?assignee_id=<uuid>         string        (literal "null" → unassigned)
  *   ?parent_id=<uuid>           string        (literal "null" → root-level)
- *   ?tags=urgent,bug            list<string>  (task must carry ALL — AND semantics)
- *   ?due_within_days=7          int>=0        (dueDate non-null AND ≤ now+N days, UTC)
- *   ?include_done=1             bool          (1/true/yes/on; default false)
+ *   ?tags=urgent,bug            list<string>  task must carry ALL (AND semantics)
+ *   ?due_within_days=7          int>=0        dueDate non-null AND ≤ now+N days
+ *   ?include_done=1             bool          1/true/yes/on; default false
  *
- * `done` exclusion: when `status` is absent from the query string AND
- * `include_done` is not truthy, rows with STATUS=done are filtered out so the
- * default backlog shows only working items. Explicit `?status=...` overrides
- * this — pass `status=done` to see completed items without `include_done`.
- *
+ * `done` is excluded by default unless `status=done` is explicit or `include_done=1`.
  * `deleted` is unconditionally excluded — listLive() is the data source.
  *
- * Output: minimal inline HTML (Twig templates land in PUB-08). The table emits
- * a `data-id` attribute per row so integration tests and the saved-views URL
- * (PUB-07) can target task rows without parsing template-specific markup.
- *
- * Invariant: no write operation occurs in this controller. Public app routes
- * register only GET — the 405 invariant test (PUB-09) verifies this.
+ * Invariant: no write operation. Public app routes register only GET.
  */
 final class BacklogController
 {
     public function __construct(
         private readonly TaskRepository $tasks,
         private readonly TagRepository $tagsRepo,
+        private readonly RosterRepository $roster,
+        private readonly TeamRepository $teams,
+        private readonly SavedViewRepository $savedViews,
+        private readonly Environment $twig,
     ) {
     }
 
@@ -55,30 +55,37 @@ final class BacklogController
         $filter = self::parseFilter($params);
         $rows   = $this->applyFilter($this->tasks->listLive(), $filter);
 
-        $html  = '<!doctype html><html lang="en"><head><meta charset="utf-8">'
-              .  '<title>Backlog</title></head><body>';
-        $html .= '<h1>Backlog</h1>';
-        $html .= '<table><thead><tr>'
-              .  '<th>ID</th><th>Slug</th><th>Title</th>'
-              .  '<th>Status</th><th>Priority</th><th>Due</th><th>Assignee</th>'
-              .  '</tr></thead><tbody>';
-        foreach ($rows as $task) {
-            $html .= sprintf(
-                '<tr data-id="%s">'
-                . '<td>%s</td><td>%s</td><td>%s</td>'
-                . '<td>%s</td><td>%s</td><td>%s</td><td>%s</td>'
-                . '</tr>',
-                self::esc($task->id),
-                self::esc($task->id),
-                self::esc($task->slug),
-                self::esc($task->title),
-                self::esc($task->status),
-                self::esc($task->priority),
-                self::esc($task->dueDate ?? ''),
-                self::esc($task->assigneeId ?? ''),
-            );
+        // Build assignee / team name maps for display
+        $assigneeMap = [];
+        foreach ($this->roster->listAll() as $m) {
+            $assigneeMap[$m->id] = $m->name;
         }
-        $html .= '</tbody></table></body></html>';
+        $teamMap = [];
+        $teamList = $this->teams->listAll();
+        foreach ($teamList as $t) {
+            $teamMap[$t->id] = $t->name;
+        }
+
+        // Saved views for nav
+        $savedViewsList = $this->savedViews->listAll();
+
+        // Build query string for CSV export link
+        $queryString = http_build_query(array_filter(
+            $params,
+            static fn($v): bool => is_string($v) && $v !== '',
+        ), '', '&', PHP_QUERY_RFC3986);
+
+        $html = $this->twig->render('backlog.twig', [
+            'tasks'        => $rows,
+            'assigneeMap'  => $assigneeMap,
+            'teamMap'      => $teamMap,
+            'activeFilter' => $filter,
+            'filterParams' => $params,
+            'roster'       => $this->roster->listAll(),
+            'teams'        => $teamList,
+            'savedViews'   => $savedViewsList,
+            'query_string' => $queryString,
+        ]);
 
         $response->getBody()->write($html);
         return $response->withHeader('Content-Type', 'text/html; charset=utf-8');
@@ -164,7 +171,7 @@ final class BacklogController
 
     /**
      * @param list<string> $tags
-     * @return array<string, true>  task IDs (as map keys) carrying every tag in $tags.
+     * @return array<string, true>
      */
     private function taskIdsCarryingAllTags(array $tags): array
     {
@@ -176,7 +183,6 @@ final class BacklogController
             }
         }
         if ($normalized === []) {
-            // Every requested tag normalized to empty — match no rows.
             return [];
         }
 
@@ -225,11 +231,6 @@ final class BacklogController
     }
 
     /**
-     * Tri-state parse for optional single-value axes that distinguish:
-     *   - absent              → {set: false, value: null}        (no filter)
-     *   - present, literal "" or "null" → {set: true,  value: null} (match IS NULL)
-     *   - present, scalar     → {set: true,  value: "<string>"}    (exact match)
-     *
      * @param array<string, mixed> $params
      * @return array{set: bool, value: ?string}
      */
@@ -286,12 +287,6 @@ final class BacklogController
         return in_array(strtolower($raw), ['1', 'true', 'yes', 'on'], true);
     }
 
-    /**
-     * Compute an ISO 8601 cutoff "now + $days" so we can compare against the
-     * raw dueDate string. Tasks store dueDate as YYYY-MM-DD (date-only) or as
-     * a full timestamp; lexicographic comparison works for both because the
-     * date prefix is the same fixed-width.
-     */
     private static function dueCutoffIso(?int $days): ?string
     {
         if ($days === null) {
@@ -299,12 +294,7 @@ final class BacklogController
         }
         $cutoff = (new DateTimeImmutable('now', new DateTimeZone('UTC')))
             ->add(new DateInterval('P' . $days . 'D'));
-        // End-of-day so a dueDate equal to today + N (date-only form) still matches.
         return $cutoff->format('Y-m-d') . 'T23:59:59.999Z';
     }
-
-    private static function esc(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE | ENT_HTML5, 'UTF-8');
-    }
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     

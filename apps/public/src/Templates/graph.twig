@@ -1,49 +1,69 @@
-<!doctype html>
-<html lang="en">
-<head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Dependency Graph &middot; Task Tracker</title>
-    <meta name="generator" content="task-tracker-public">
-    <style>
-        #graph-canvas { width: 100%; height: 720px; border: 1px solid #ddd; }
-        .banner-warn { background: #fff3cd; border: 1px solid #ffe69c; padding: 0.5em 0.75em; margin: 0.5em 0; }
-    </style>
-</head>
-<body>
-<header>
-    <h1>Dependency Graph</h1>
-    <p class="meta">
-        Arrow direction: prereq &rarr; blocked task.
-        Node fill = status, border = priority. Click a node to open its detail page.
-    </p>
-</header>
+{% extends 'layout.twig' %}
 
-<form method="get" action="/graph" class="filters" id="graph-filters">
-    <fieldset>
-        <legend>Status</legend>
-        {% for s in statuses_live %}
-            <label>
-                <input type="checkbox" name="status_pick" value="{{ s }}"
+{% block title %}Dependency Graph &middot; Task Tracker{% endblock %}
+
+{# Defaults so direct template rendering stays safe #}
+{% set status_filter  = status_filter  ?? [] %}
+{% set statuses_live  = statuses_live  ?? ['open','in_progress','blocked','done'] %}
+{% set team_id        = team_id        ?? '' %}
+{% set root           = root           ?? '' %}
+{% set json_url       = json_url       ?? '/graph.json' %}
+{% set node_ceiling   = node_ceiling   ?? 200 %}
+
+{% block content %}
+<div class="mb-3">
+    <h1 class="h3 mb-1">Dependency Graph</h1>
+    <p class="text-muted small mb-0">Arrow direction: prereq &rarr; blocked task.
+        Node fill&nbsp;= status &middot; border&nbsp;= priority.
+        Click a node to open its detail page.</p>
+</div>
+
+{# ── Filter bar ── #}
+<form method="get" action="/graph" class="row g-2 mb-3 align-items-end p-3 bg-white border rounded"
+      id="graph-filters">
+    <div class="col-12 col-md-auto">
+        <label class="form-label small mb-1 d-block">Status</label>
+        <div class="d-flex flex-wrap gap-2">
+            {% for s in statuses_live %}
+            <div class="form-check form-check-inline mb-0">
+                <input class="form-check-input" type="checkbox" name="status_pick"
+                       id="s-{{ s }}" value="{{ s }}"
                        {% if s in status_filter %}checked{% endif %}>
-                {{ s }}
-            </label>
-        {% endfor %}
+                <label class="form-check-label small" for="s-{{ s }}">{{ s }}</label>
+            </div>
+            {% endfor %}
+        </div>
         <input type="hidden" name="status" id="status-input"
                value="{{ status_filter|join(',') }}">
-    </fieldset>
-    <label>Team <input type="text" name="team_id" value="{{ team_id }}" placeholder="team id"></label>
-    <label>Root <input type="text" name="root"    value="{{ root }}"    placeholder="task id (subtree)"></label>
-    <button type="submit">Apply</button>
+    </div>
+    <div class="col-sm-6 col-md-2">
+        <label for="f-team" class="form-label small mb-1">Team ID</label>
+        <input id="f-team" type="text" name="team_id" class="form-control form-control-sm"
+               placeholder="uuid" value="{{ team_id }}">
+    </div>
+    <div class="col-sm-6 col-md-2">
+        <label for="f-root" class="form-label small mb-1">Root subtree</label>
+        <input id="f-root" type="text" name="root" class="form-control form-control-sm"
+               placeholder="task id" value="{{ root }}">
+    </div>
+    <div class="col-sm-6 col-md-auto d-flex gap-1">
+        <button type="submit" class="btn btn-sm btn-outline-primary">Apply</button>
+        <a href="/graph" class="btn btn-sm btn-outline-secondary">Clear</a>
+    </div>
 </form>
 
-<div id="graph-banner" hidden class="banner-warn"
-     data-node-ceiling="{{ node_ceiling }}">
+{# ── Threshold warning ── #}
+<div id="graph-banner" hidden
+     class="alert alert-warning py-2 mb-2"
+     data-node-ceiling="{{ node_ceiling }}" role="alert">
     Graph exceeds {{ node_ceiling }} nodes &mdash; consider tightening filters
     (status, team, or root subtree).
 </div>
 
+{# ── Canvas ── #}
 <div id="graph-canvas"
+     class="border rounded bg-white"
+     style="width:100%;height:680px"
      data-json-url="{{ json_url }}"></div>
 
 <script src="/vendor/cytoscape/cytoscape.min.js"></script>
@@ -51,8 +71,7 @@
 <script>
 (function () {
     // Collapse the status checkbox group into the single hidden field the
-    // controller expects (comma-separated). The form has no client-side
-    // framework — this is the minimum glue to keep the submitted shape stable.
+    // controller expects (comma-separated).
     var form = document.getElementById('graph-filters');
     if (form) {
         form.addEventListener('submit', function () {
@@ -71,7 +90,7 @@
     var container = document.getElementById('graph-canvas');
     if (!container || typeof cytoscape === 'undefined') { return; }
     var jsonUrl = container.getAttribute('data-json-url') || '/graph.json';
-    var banner = document.getElementById('graph-banner');
+    var banner  = document.getElementById('graph-banner');
 
     var statusFill = {
         open: '#9ca3af', in_progress: '#3b82f6',
@@ -122,7 +141,9 @@
                         }
                     }
                 ],
-                layout: { name: typeof window.cytoscapeDagre !== 'undefined' ? 'dagre' : 'breadthfirst' }
+                layout: {
+                    name: typeof window.cytoscapeDagre !== 'undefined' ? 'dagre' : 'breadthfirst'
+                }
             });
             cy.on('tap', 'node', function (evt) {
                 var id = evt.target.id();
@@ -131,5 +152,4 @@
         });
 })();
 </script>
-</body>
-</html>
+{% endblock %}

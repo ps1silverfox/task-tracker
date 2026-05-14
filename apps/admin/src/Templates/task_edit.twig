@@ -2,6 +2,11 @@
 
 {% block title %}{% if task is null %}New task{% else %}Edit {{ task.slug }}{% endif %} · Admin{% endblock %}
 
+{# Defaults so the template is safe to render from RenderingTest without all context vars. #}
+{% set currentTags   = currentTags   ?? [] %}
+{% set currentDeps   = currentDeps   ?? [] %}
+{% set parentOptions = parentOptions ?? [] %}
+
 {% block content %}
 <nav aria-label="breadcrumb">
     <ol class="breadcrumb">
@@ -70,7 +75,7 @@
             <option value="">— unassigned —</option>
             {% for m in roster %}
                 <option value="{{ m.id }}"{% if task and task.assigneeId == m.id %} selected{% endif %}>
-                    {{ m.name }}
+                    {{ m.name }}{% if not m.active %} (inactive){% endif %}
                 </option>
             {% endfor %}
         </select>
@@ -89,9 +94,15 @@
     </div>
 
     <div class="col-md-4">
-        <label for="parent_id" class="form-label">Parent task ID</label>
-        <input type="text" class="form-control" id="parent_id" name="parent_id"
-               value="{{ task.parentId ?? '' }}">
+        <label for="parent_id" class="form-label">Parent task</label>
+        <select class="form-select" id="parent_id" name="parent_id">
+            <option value="">— none (root task) —</option>
+            {% for p in parentOptions %}
+                <option value="{{ p.id }}"{% if task and task.parentId == p.id %} selected{% endif %}>
+                    {{ p.slug }} · {{ p.title }}
+                </option>
+            {% endfor %}
+        </select>
     </div>
 
     <div class="col-12">
@@ -101,17 +112,4 @@
     </div>
 
     <div class="col-12 d-flex gap-2">
-        <button type="submit" class="btn btn-primary">
-            {% if task is null %}Create{% else %}Save{% endif %}
-        </button>
-        <a href="/" class="btn btn-outline-secondary">Cancel</a>
-        {% if task is not null %}
-            <button type="submit" formaction="/tasks/{{ task.id|url_encode }}/delete"
-                    formmethod="post" class="btn btn-outline-danger ms-auto"
-                    onclick="return confirm('Soft-delete this task?');">
-                Delete
-            </button>
-        {% endif %}
-    </div>
-</form>
-{% endblock %}
+        <button type="submit" clas
