@@ -34,7 +34,7 @@ final class GraphControllerTest extends TestCase
             smtpHost: null,
             smtpPort: 25,
             smtpFrom: 'noreply@localhost',
-            baseUrl:  'http://localhost',
+            baseUrl:  'http://localhost:8083',
             timezone: 'UTC',
         );
         $this->app = Bootstrap::boot($env);

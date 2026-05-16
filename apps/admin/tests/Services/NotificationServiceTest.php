@@ -42,7 +42,7 @@ final class NotificationServiceTest extends TestCase
             smtpHost: 'smtp.test',
             smtpPort: 25,
             smtpFrom: 'tracker@corp.test',
-            baseUrl:  'http://127.0.0.1:8080',
+            baseUrl:  'http://127.0.0.1:8084',
             timezone: 'UTC',
         );
 
@@ -87,7 +87,7 @@ final class NotificationServiceTest extends TestCase
         self::assertIsString($body);
         self::assertStringContainsString('Fix the bug', $body);
         self::assertStringContainsString('high', $body);
-        self::assertStringContainsString('http://127.0.0.1:8080/tasks/' . $task->id, $body);
+        self::assertStringContainsString('http://127.0.0.1:8084/tasks/' . $task->id, $body);
     }
 
     public function testNotifyAssignmentSkipsWhenRosterMemberHasNoEmail(): void
@@ -205,7 +205,7 @@ final class NotificationServiceTest extends TestCase
             smtpHost: null,
             smtpPort: 25,
             smtpFrom: 'tracker@corp.test',
-            baseUrl:  'http://127.0.0.1:8080',
+            baseUrl:  'http://127.0.0.1:8084',
             timezone: 'UTC',
         );
         $disabledMailer = new SmtpMailer($disabledEnv);

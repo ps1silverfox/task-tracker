@@ -62,7 +62,7 @@ final class AuditCompletenessTest extends TestCase
             smtpHost: null,
             smtpPort: 25,
             smtpFrom: 'noreply@localhost',
-            baseUrl:  'http://127.0.0.1',
+            baseUrl:  'http://127.0.0.1:8083',
             timezone: 'UTC',
         );
 

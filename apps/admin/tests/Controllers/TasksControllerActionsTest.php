@@ -35,7 +35,7 @@ final class TasksControllerActionsTest extends TestCase
             smtpHost: null,
             smtpPort: 25,
             smtpFrom: 'noreply@localhost',
-            baseUrl:  'http://127.0.0.1:8080',
+            baseUrl:  'http://127.0.0.1:8084',
             timezone: 'UTC',
         );
         $this->app = Bootstrap::boot($this->env);
