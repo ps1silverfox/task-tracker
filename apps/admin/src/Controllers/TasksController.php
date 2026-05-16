@@ -476,4 +476,54 @@ final class TasksController
     private static function normalizeInput(array $body): array
     {
         return [
-            'slug'        => $body['slug'
+            'slug'        => $body['slug']         ?? null,
+            'title'       => $body['title']        ?? null,
+            'body'        => $body['body']         ?? null,
+            'status'      => $body['status']       ?? null,
+            'priority'    => $body['priority']     ?? null,
+            'dueDate'     => $body['due_date']     ?? null,
+            'effortHours' => $body['effort_hours'] ?? null,
+            'url'         => $body['url']          ?? null,
+            'parentId'    => $body['parent_id']    ?? null,
+            'assigneeId'  => $body['assignee_id']  ?? null,
+            'teamId'      => $body['team_id']      ?? null,
+        ];
+    }
+
+    /**
+     * Sparse update — only forward keys present in the body.
+     *
+     * @param array<string, mixed> $body
+     * @return array<string, mixed>
+     */
+    private static function normalizeUpdateInput(array $body): array
+    {
+        $map = [
+            'slug'         => 'slug',
+            'title'        => 'title',
+            'body'         => 'body',
+            'status'       => 'status',
+            'priority'     => 'priority',
+            'due_date'     => 'dueDate',
+            'effort_hours' => 'effortHours',
+            'url'          => 'url',
+            'parent_id'    => 'parentId',
+            'assignee_id'  => 'assigneeId',
+            'team_id'      => 'teamId',
+        ];
+        $out = [];
+        foreach ($map as $formKey => $repoKey) {
+            if (array_key_exists($formKey, $body)) {
+                $out[$repoKey] = $body[$formKey];
+            }
+        }
+        return $out;
+    }
+
+    private function jsonError(ResponseInterface $response, string $code, string $message): ResponseInterface
+    {
+        $payload = json_encode(['error' => $code, 'message' => $message], JSON_THROW_ON_ERROR);
+        $response->getBody()->write($payload);
+        return $response->withHeader('Content-Type', 'application/json; charset=utf-8');
+    }
+}

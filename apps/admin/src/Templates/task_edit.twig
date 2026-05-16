@@ -112,4 +112,75 @@
     </div>
 
     <div class="col-12 d-flex gap-2">
-        <button type="submit" clas
+        <button type="submit" class="btn btn-primary">
+            {% if task is null %}Create{% else %}Save{% endif %}
+        </button>
+        <a href="/" class="btn btn-outline-secondary">Cancel</a>
+        {% if task is not null %}
+            <button type="submit" formaction="/tasks/{{ task.id|url_encode }}/delete"
+                    formmethod="post" class="btn btn-outline-danger ms-auto"
+                    onclick="return confirm('Soft-delete this task?');">
+                Delete
+            </button>
+        {% endif %}
+    </div>
+</form>
+
+{% if task is not null %}
+
+{# ── Tags section (UI-02) ── #}
+<hr class="my-4">
+<div class="row g-3">
+    <div class="col-md-6">
+        <h2 class="h5">Tags</h2>
+        <div class="d-flex flex-wrap gap-1 mb-2">
+            {% if currentTags is empty %}
+                <span class="text-muted small">No tags yet.</span>
+            {% else %}
+                {% for tag in currentTags %}
+                    <span class="badge bg-primary">
+                        {{ tag }}
+                        <form method="post" action="/tasks/{{ task.id|url_encode }}/tags/{{ tag|url_encode }}/remove"
+                              class="d-inline ms-1">
+                            <button type="submit" class="btn-close btn-close-white btn-sm"
+                                    aria-label="Remove tag {{ tag }}" style="filter:none;font-size:0.6rem;"></button>
+                        </form>
+                    </span>
+                {% endfor %}
+            {% endif %}
+        </div>
+        <form method="post" action="/tasks/{{ task.id|url_encode }}/tags" class="input-group input-group-sm">
+            <input type="text" name="tag" class="form-control" placeholder="new-tag" required pattern="[a-z0-9][a-z0-9-]*">
+            <button type="submit" class="btn btn-outline-primary">Add tag</button>
+        </form>
+    </div>
+
+    {# ── Dependencies section (UI-02) ── #}
+    <div class="col-md-6">
+        <h2 class="h5">Prerequisites</h2>
+        {% if currentDeps is empty %}
+            <p class="text-muted small">No prerequisites.</p>
+        {% else %}
+            <ul class="list-group list-group-flush mb-2">
+                {% for dep in currentDeps %}
+                <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                    <a href="/tasks/{{ dep.id|url_encode }}">{{ dep.slug }} · {{ dep.title }}</a>
+                    <form method="delete" action="/tasks/{{ task.id|url_encode }}/dependencies/{{ dep.id|url_encode }}"
+                          class="d-inline">
+                        <button type="submit" class="btn btn-outline-danger btn-sm">Remove</button>
+                    </form>
+                </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+        <form method="post" action="/tasks/{{ task.id|url_encode }}/dependencies"
+              class="input-group input-group-sm">
+            <input type="text" name="prereq_id" class="form-control font-monospace"
+                   placeholder="prerequisite task UUID" required>
+            <button type="submit" class="btn btn-outline-secondary">Add prereq</button>
+        </form>
+    </div>
+</div>
+
+{% endif %}
+{% endblock %}

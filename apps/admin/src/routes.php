@@ -46,4 +46,15 @@ return static function (App $app): void {
     $app->post('/teams/{id}',         [TeamsController::class, 'update']);
 
     // ADMIN-07 saved-views routes. No update verb: closed event enum admits only
- 
+    // saved_view.created and saved_view.deleted (spec §381-382).
+    $app->get('/saved-views',                    [SavedViewsController::class, 'list']);
+    $app->post('/saved-views',                   [SavedViewsController::class, 'create']);
+    $app->delete('/saved-views/{id}',            [SavedViewsController::class, 'delete']);
+    // HTML-form delete alias (browsers cannot emit DELETE from a plain <form>).
+    $app->post('/saved-views/{id}/delete',       [SavedViewsController::class, 'delete']);
+
+    // ADMIN-08 liveness probe. The 404 handler for unmapped routes is installed
+    // on the ErrorMiddleware in Bootstrap (not as a route) so it also catches
+    // requests whose path doesn't match any registered pattern.
+    $app->get('/health',              [HealthController::class, 'check']);
+};

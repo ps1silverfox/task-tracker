@@ -237,4 +237,16 @@ final class Bootstrap
 
             public function get(string $id): object
             {
-                if (array_key_exists($id,
+                if (array_key_exists($id, $this->cache)) {
+                    return $this->cache[$id];
+                }
+                if (!isset($this->factories[$id])) {
+                    throw new class("service not found: {$id}")
+                        extends RuntimeException
+                        implements NotFoundExceptionInterface {};
+                }
+                return $this->cache[$id] = ($this->factories[$id])($this);
+            }
+        };
+    }
+}
